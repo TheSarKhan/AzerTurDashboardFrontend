@@ -161,6 +161,35 @@ function App() {
     CANCELLED: t("Cancelled", "Отменено", "Ləğv edilib"),
   };
   function problem(e: unknown) {
+    const specific: Record<string, [string, string, string]> = {
+      MANUAL_REFUND_REQUIRED: [
+        "The revised total is below the amount already paid. A manual refund must be handled first.",
+        "Новая сумма меньше уже оплаченной. Сначала нужно обработать ручной возврат.",
+        "Yeni məbləğ artıq ödənilmiş məbləğdən azdır. Əvvəl manual geri ödəniş həll edilməlidir.",
+      ],
+      PAID_CURRENCY_CANNOT_CHANGE: [
+        "A paid reservation must keep its original currency.",
+        "Оплаченное бронирование должно сохранить исходную валюту.",
+        "Ödəniş edilmiş rezervasiyanın valyutası dəyişdirilə bilməz.",
+      ],
+      QUOTE_EXPIRED: [
+        "The quote expired. Calculate a new one.",
+        "Срок расчёта истёк. Рассчитайте заново.",
+        "Qiymətin müddəti bitib. Yenidən hesablayın.",
+      ],
+      ALREADY_RESOLVED: [
+        "Another employee already handled this request. Refresh the queue.",
+        "Другой сотрудник уже обработал запрос. Обновите очередь.",
+        "Bu sorğunu başqa əməkdaş artıq həll edib. Növbəni yeniləyin.",
+      ],
+      ALREADY_REVIEWED: [
+        "This reservation has already been reviewed. Refresh the queue.",
+        "Это бронирование уже проверено. Обновите очередь.",
+        "Bu rezervasiya artıq yoxlanılıb. Növbəni yeniləyin.",
+      ],
+    };
+    if (e instanceof Error && specific[e.message])
+      return t(...specific[e.message]);
     return e instanceof Error && e.message === "ACCESS_DENIED"
       ? t(
           "Access denied. Check your office credentials.",
