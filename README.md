@@ -18,3 +18,7 @@ npm run build
 ```
 
 The Dockerfile serves the built static app using unprivileged Nginx. Set `VITE_API_BASE_URL` at build time. See [architecture](docs/ARCHITECTURE.md).
+
+## Customer review workflow update
+
+The customer registration, durable reservation request, office approval and demo-payment flows are now implemented. See [the current architecture, API and remaining production work](docs/ARCHITECTURE.md); that document supersedes the initial foundation-only notes above. No cloud deployment or live payment/provider connection is included.
