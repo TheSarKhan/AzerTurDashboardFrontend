@@ -9,7 +9,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open http://localhost:5173. The Java backend must run on `VITE_API_BASE_URL`. Sign in with `OPERATIONS_USER` / `OPERATIONS_PASSWORD` from the backend's local environment. Credentials are entered at runtime and remain in memory; never place them in a Vite environment variable.
+Open http://localhost:5173. The Java backend must run on `VITE_API_BASE_URL`. Sign in with your own email and password. For a fresh local database use the `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` from the backend's local environment, then create personal accounts under Staff (administrators only). The session token is entered at runtime and remains in memory; never place credentials in a Vite environment variable. `admin.*` hosts accept administrators only; `operator.*` hosts accept operators and administrators.
 
 Overview, catalogue and recent quote views use real API/database responses. This is the operations foundation, not a complete booking administration system. Production identity, staff roles, CRUD, reservation assignment and payment reconciliation will be added through backend endpoints.
 

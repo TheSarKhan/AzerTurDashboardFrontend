@@ -68,6 +68,17 @@ export interface Audit {
   note: string;
   created_at: string;
 }
+export interface Staff {
+  id: string;
+  email: string;
+  name: string;
+  role: "ADMIN" | "OPERATOR";
+}
+export interface StaffAccount extends Staff {
+  active: boolean;
+  createdAt: string;
+  lastLoginAt: string | null;
+}
 export async function api<T>(
   path: string,
   authorization?: string,
@@ -104,3 +115,12 @@ export const requests = (auth: string) =>
   api<BookingRequest[]>("/api/v1/operations/requests", auth);
 export const notifications = (auth: string) =>
   api<Notification[]>("/api/v1/operations/notifications", auth);
+export const staffLogin = (email: string, password: string) =>
+  api<{ token: string; staff: Staff }>("/api/v1/staff/auth/login", undefined, {
+    email,
+    password,
+  });
+export const staffLogout = (auth: string) =>
+  api<void>("/api/v1/staff/auth/logout", auth, {});
+export const staffAccounts = (auth: string) =>
+  api<StaffAccount[]>("/api/v1/admin/staff", auth);

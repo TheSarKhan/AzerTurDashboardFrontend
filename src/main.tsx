@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   Inbox,
   Bell,
+  Users,
 } from "lucide-react";
 import {
   api,
@@ -18,6 +19,11 @@ import {
   bookings,
   requests,
   notifications,
+  staffLogin,
+  staffLogout,
+  staffAccounts,
+  type Staff,
+  type StaffAccount,
   type Overview,
   type Tour,
   type Booking,
@@ -127,6 +133,8 @@ function App() {
     [inbox, setInbox] = useState<BookingRequest[]>([]),
     [outbox, setOutbox] = useState<Notification[]>([]),
     [auth, setAuth] = useState(""),
+    [staff, setStaff] = useState<Staff | null>(null),
+    [accounts, setAccounts] = useState<StaffAccount[]>([]),
     [view, setView] = useState("Overview"),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -138,9 +146,17 @@ function App() {
     >({});
   const t = (en: string, ru: string, az: string) =>
     locale === "az" ? az : locale === "ru" ? ru : en;
+  // admin.* is for administrators only; the API enforces roles, this keeps the UI honest.
+  const adminHost = window.location.hostname.startsWith("admin.");
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
+  useEffect(() => {
+    if (view !== "Staff" || staff?.role !== "ADMIN" || !auth) return;
+    staffAccounts(auth)
+      .then(setAccounts)
+      .catch((e) => setError(problem(e)));
+  }, [view, auth, staff]);
   const names: Record<string, string> = {
     Overview: t("Overview", "Обзор", "İcmal"),
     Tours: t("Tours", "Туры", "Turlar"),
@@ -148,6 +164,7 @@ function App() {
     Bookings: t("Bookings", "Бронирования", "Rezervasiyalar"),
     Requests: t("Customer requests", "Запросы клиентов", "Müştəri sorğuları"),
     Notifications: t("Notifications", "Уведомления", "Bildirişlər"),
+    Staff: t("Staff", "Сотрудники", "İşçilər"),
   };
   const statuses: Record<string, string> = {
     PENDING_REVIEW: t("Needs review", "На проверке", "Yoxlama gözləyir"),
@@ -188,19 +205,73 @@ function App() {
         "Bu rezervasiya artıq yoxlanılıb. Növbəni yeniləyin.",
       ],
     };
+    Object.assign(specific, {
+      TOO_MANY_ATTEMPTS: [
+        "Too many attempts. Wait 15 minutes and try again.",
+        "Слишком много попыток. Подождите 15 минут.",
+        "Çox cəhd edilib. 15 dəqiqə gözləyib yenidən cəhd edin.",
+      ],
+      ACCOUNT_UNAVAILABLE: [
+        "An account with this email already exists.",
+        "Аккаунт с таким email уже существует.",
+        "Bu email ilə hesab artıq mövcuddur.",
+      ],
+      PASSWORD_TOO_SHORT: [
+        "The password must have at least 12 characters.",
+        "Пароль должен содержать не менее 12 символов.",
+        "Şifrə ən azı 12 simvoldan ibarət olmalıdır.",
+      ],
+      PASSWORD_TOO_LONG: [
+        "The password is too long (72 bytes at most).",
+        "Пароль слишком длинный (не более 72 байт).",
+        "Şifrə çox uzundur (ən çox 72 bayt).",
+      ],
+      CANNOT_DEACTIVATE_SELF: [
+        "You cannot deactivate your own account.",
+        "Нельзя отключить собственный аккаунт.",
+        "Öz hesabınızı deaktiv edə bilməzsiniz.",
+      ],
+      CANNOT_DEMOTE_SELF: [
+        "You cannot remove your own administrator role.",
+        "Нельзя снять с себя роль администратора.",
+        "Öz administrator rolunuzu ala bilməzsiniz.",
+      ],
+      LAST_ADMIN: [
+        "At least one active administrator must remain.",
+        "Должен остаться хотя бы один активный администратор.",
+        "Ən azı bir aktiv administrator qalmalıdır.",
+      ],
+      VALIDATION_ERROR: [
+        "Check the entered details.",
+        "Проверьте введённые данные.",
+        "Daxil edilən məlumatları yoxlayın.",
+      ],
+    });
     if (e instanceof Error && specific[e.message])
       return t(...specific[e.message]);
     return e instanceof Error && e.message === "ACCESS_DENIED"
       ? t(
-          "Access denied. Check your office credentials.",
-          "Доступ запрещён. Проверьте учётные данные офиса.",
-          "Giriş mümkün deyil. Ofis hesabının məlumatlarını yoxlayın.",
+          "Access denied. Check your email and password.",
+          "Доступ запрещён. Проверьте email и пароль.",
+          "Giriş mümkün deyil. Email və şifrəni yoxlayın.",
         )
       : t(
           "Request failed. Refresh to see the latest state.",
           "Запрос не выполнен. Обновите состояние.",
           "Sorğu alınmadı. Son vəziyyəti görmək üçün yeniləyin.",
         );
+  }
+  function reset() {
+    setAuth("");
+    setStaff(null);
+    setData(null);
+    setCatalog([]);
+    setReservations([]);
+    setInbox([]);
+    setOutbox([]);
+    setAccounts([]);
+    setHistory({});
+    setView("Overview");
   }
   async function load(credentials: string) {
     setBusy(true);
@@ -219,6 +290,58 @@ function App() {
       setInbox(r);
       setOutbox(n);
       setAuth(credentials);
+      return true;
+    } catch (e) {
+      // An expired or revoked session cannot recover by refreshing.
+      if (credentials && e instanceof Error && e.message === "ACCESS_DENIED")
+        reset();
+      setError(problem(e));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function signIn(email: string, password: string) {
+    setBusy(true);
+    setError("");
+    try {
+      const session = await staffLogin(email, password);
+      const token = "Bearer " + session.token;
+      if (adminHost && session.staff.role !== "ADMIN") {
+        await staffLogout(token).catch(() => undefined);
+        setError(
+          t(
+            "This address is for administrators. Use operator.aztrip.online.",
+            "Этот адрес только для администраторов. Используйте operator.aztrip.online.",
+            "Bu ünvan yalnız administratorlar üçündür. operator.aztrip.online-dan istifadə edin.",
+          ),
+        );
+        return;
+      }
+      setStaff(session.staff);
+      if (!(await load(token))) {
+        setStaff(null);
+        await staffLogout(token).catch(() => undefined);
+      }
+    } catch (e) {
+      setError(problem(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function signOut() {
+    const token = auth;
+    reset();
+    setError("");
+    if (token) await staffLogout(token).catch(() => undefined);
+  }
+  async function manage(action: () => Promise<unknown>) {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await action();
+      setAccounts(await staffAccounts(auth));
     } catch (e) {
       setError(problem(e));
     } finally {
@@ -282,22 +405,12 @@ function App() {
           onSubmit={(e) => {
             e.preventDefault();
             const f = new FormData(e.currentTarget);
-            void load(
-              "Basic " +
-                btoa(
-                  String(f.get("username")) + ":" + String(f.get("password")),
-                ),
-            );
+            void signIn(String(f.get("email")), String(f.get("password")));
           }}
         >
           <label>
-            {t("Username", "Логин", "İstifadəçi adı")}
-            <input
-              name="username"
-              autoComplete="username"
-              defaultValue="operations"
-              required
-            />
+            {t("Email", "Email", "Email")}
+            <input name="email" type="email" autoComplete="username" required />
           </label>
           <label>
             {t("Password", "Пароль", "Şifrə")}
@@ -322,9 +435,9 @@ function App() {
         </form>
         <small>
           {t(
-            "Demo payment mode. Credentials are kept only in memory.",
-            "Демо-оплата. Учётные данные хранятся только в памяти.",
-            "Demo ödəniş rejimi. Giriş məlumatları yalnız yaddaşda saxlanılır.",
+            "Demo payment mode. The session is kept only in memory.",
+            "Демо-оплата. Сессия хранится только в памяти.",
+            "Demo ödəniş rejimi. Sessiya yalnız yaddaşda saxlanılır.",
           )}
         </small>
       </main>
@@ -339,6 +452,16 @@ function App() {
         <p className="workspace">
           {t("Office operations", "Операции офиса", "Ofis əməliyyatları")}
         </p>
+        {staff && (
+          <p className="workspace who">
+            {staff.name}
+            <br />
+            {staff.email} ·{" "}
+            {staff.role === "ADMIN"
+              ? t("Administrator", "Администратор", "Administrator")
+              : t("Operator", "Оператор", "Operator")}
+          </p>
+        )}
         <nav>
           {[
             [LayoutDashboard, "Overview"],
@@ -347,6 +470,7 @@ function App() {
             [Map, "Tours"],
             [FileText, "Quotes"],
             [Bell, "Notifications"],
+            ...(staff?.role === "ADMIN" ? [[Users, "Staff"]] : []),
           ].map(([Icon, title]) => {
             const I = Icon as typeof Map;
             return (
@@ -362,19 +486,7 @@ function App() {
             );
           })}
         </nav>
-        <button
-          className="logout"
-          onClick={() => {
-            setAuth("");
-            setData(null);
-            setCatalog([]);
-            setReservations([]);
-            setInbox([]);
-            setOutbox([]);
-            setHistory({});
-            setError("");
-          }}
-        >
+        <button className="logout" onClick={() => void signOut()}>
           <LogOut size={18} />
           {t("Sign out", "Выйти", "Çıxış")}
         </button>
@@ -382,7 +494,10 @@ function App() {
       <main>
         <header>
           <div>
-            <p>AZERTUR / OPERATIONS</p>
+            <p>
+              AZERTUR /{" "}
+              {staff?.role === "ADMIN" && adminHost ? "ADMIN" : "OPERATIONS"}
+            </p>
             <h1>{names[view]}</h1>
           </div>
           <div className="header-actions">
@@ -492,7 +607,12 @@ function App() {
                         {(() => {
                           try {
                             const input = JSON.parse(b.quotePayload).input;
-                            if (input.customDays) return t("Custom journey", "Индивидуальный маршрут", "Fərdi səfər");
+                            if (input.customDays)
+                              return t(
+                                "Custom journey",
+                                "Индивидуальный маршрут",
+                                "Fərdi səfər",
+                              );
                             const slug = input.slug;
                             const tour = catalog.find((t) => t.slug === slug);
                             return tour
@@ -903,6 +1023,174 @@ function App() {
                               "Provayder qoşulmayıb",
                             )
                           : n.status}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+        {view === "Staff" && staff?.role === "ADMIN" && (
+          <>
+            <p>
+              {t(
+                "Every employee signs in with their own email. Role, password and deactivation changes take effect immediately and end that person's active sessions.",
+                "Каждый сотрудник входит со своим email. Изменение роли, пароля и отключение действуют сразу и завершают активные сессии.",
+                "Hər əməkdaş öz emaili ilə daxil olur. Rol, şifrə və deaktiv etmə dəyişiklikləri dərhal qüvvəyə minir və həmin şəxsin aktiv sessiyalarını bağlayır.",
+              )}
+            </p>
+            <form
+              className="staff-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const form = e.currentTarget;
+                const f = new FormData(form);
+                void manage(async () => {
+                  await api("/api/v1/admin/staff", auth, {
+                    email: String(f.get("email")),
+                    name: String(f.get("name")),
+                    role: String(f.get("role")),
+                    password: String(f.get("password")),
+                  });
+                  form.reset();
+                });
+              }}
+            >
+              <label>
+                {t("Full name", "Имя", "Ad, soyad")}
+                <input name="name" minLength={2} maxLength={120} required />
+              </label>
+              <label>
+                {t("Email", "Email", "Email")}
+                <input name="email" type="email" required />
+              </label>
+              <label>
+                {t("Role", "Роль", "Rol")}
+                <select name="role" defaultValue="OPERATOR">
+                  <option value="OPERATOR">
+                    {t("Operator", "Оператор", "Operator")}
+                  </option>
+                  <option value="ADMIN">
+                    {t("Administrator", "Администратор", "Administrator")}
+                  </option>
+                </select>
+              </label>
+              <label>
+                {t(
+                  "Temporary password (12+ characters)",
+                  "Временный пароль (от 12 символов)",
+                  "Müvəqqəti şifrə (12+ simvol)",
+                )}
+                <input
+                  name="password"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={12}
+                  maxLength={72}
+                  required
+                />
+              </label>
+              <button disabled={busy}>
+                {t("Create account", "Создать аккаунт", "Hesab yarat")}
+              </button>
+            </form>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t("Employee", "Сотрудник", "Əməkdaş")}</th>
+                    <th>{t("Role", "Роль", "Rol")}</th>
+                    <th>{t("Last sign-in", "Последний вход", "Son giriş")}</th>
+                    <th>{t("Status", "Статус", "Status")}</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {accounts.map((a) => (
+                    <tr key={a.id}>
+                      <td>
+                        {a.name}
+                        <small>{a.email}</small>
+                      </td>
+                      <td>
+                        <select
+                          aria-label={t("Role", "Роль", "Rol")}
+                          value={a.role}
+                          disabled={busy || a.id === staff.id}
+                          onChange={(e) =>
+                            void manage(() =>
+                              api(`/api/v1/admin/staff/${a.id}/role`, auth, {
+                                role: e.target.value,
+                              }),
+                            )
+                          }
+                        >
+                          <option value="OPERATOR">
+                            {t("Operator", "Оператор", "Operator")}
+                          </option>
+                          <option value="ADMIN">
+                            {t(
+                              "Administrator",
+                              "Администратор",
+                              "Administrator",
+                            )}
+                          </option>
+                        </select>
+                      </td>
+                      <td>
+                        {a.lastLoginAt
+                          ? new Date(a.lastLoginAt).toLocaleString()
+                          : t("Never", "Никогда", "Heç vaxt")}
+                      </td>
+                      <td>
+                        {a.active
+                          ? t("Active", "Активен", "Aktiv")
+                          : t("Deactivated", "Отключён", "Deaktiv")}
+                      </td>
+                      <td className="row-actions">
+                        <button
+                          className="small"
+                          disabled={busy}
+                          onClick={() => {
+                            const password = window.prompt(
+                              t(
+                                "New temporary password (12+ characters):",
+                                "Новый временный пароль (от 12 символов):",
+                                "Yeni müvəqqəti şifrə (12+ simvol):",
+                              ),
+                            );
+                            if (password)
+                              void manage(() =>
+                                api(
+                                  `/api/v1/admin/staff/${a.id}/password`,
+                                  auth,
+                                  { password },
+                                ),
+                              );
+                          }}
+                        >
+                          {t(
+                            "Reset password",
+                            "Сбросить пароль",
+                            "Şifrəni sıfırla",
+                          )}
+                        </button>
+                        <button
+                          className="small danger"
+                          disabled={busy || (a.id === staff.id && a.active)}
+                          onClick={() =>
+                            void manage(() =>
+                              api(`/api/v1/admin/staff/${a.id}/active`, auth, {
+                                active: !a.active,
+                              }),
+                            )
+                          }
+                        >
+                          {a.active
+                            ? t("Deactivate", "Отключить", "Deaktiv et")
+                            : t("Activate", "Включить", "Aktiv et")}
+                        </button>
                       </td>
                     </tr>
                   ))}
