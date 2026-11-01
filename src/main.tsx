@@ -27,6 +27,7 @@ import {
   type Locale,
 } from "./api/client";
 import "./styles.css";
+import OfferWorkspace from "./offer-workspace";
 
 function QuoteDetails({
   booking,
@@ -121,6 +122,7 @@ function QuoteDetails({
 }
 
 function App() {
+  const [offerDirty, setOfferDirty] = useState(false);
   const [data, setData] = useState<Overview | null>(null),
     [catalog, setCatalog] = useState<Tour[]>([]),
     [reservations, setReservations] = useState<Booking[]>([]),
@@ -145,7 +147,7 @@ function App() {
     Overview: t("Overview", "Обзор", "İcmal"),
     Tours: t("Tours", "Туры", "Turlar"),
     Quotes: t("Quotes", "Расчёты", "Qiymət sorğuları"),
-    Bookings: t("Bookings", "Бронирования", "Rezervasiyalar"),
+    Bookings: t("Travel requests", "Заявки на поездки", "Səfər sorğuları"),
     Requests: t("Customer requests", "Запросы клиентов", "Müştəri sorğuları"),
     Notifications: t("Notifications", "Уведомления", "Bildirişlər"),
   };
@@ -335,7 +337,12 @@ function App() {
   return (
     <div className="shell">
       <aside>
-        <p className="brand">azertur</p>
+        <p className="brand">
+          <span className="ow-brand-mark" aria-hidden="true">
+            A
+          </span>{" "}
+          azərtur
+        </p>
         <p className="workspace">
           {t("Office operations", "Операции офиса", "Ofis əməliyyatları")}
         </p>
@@ -353,7 +360,23 @@ function App() {
               <button
                 key={title as string}
                 className={view === title ? "active" : ""}
-                onClick={() => setView(title as string)}
+                onClick={() => {
+                  if (title === view) return;
+                  if (
+                    offerDirty &&
+                    title !== view &&
+                    !window.confirm(
+                      t(
+                        "Discard unsaved offer edits?",
+                        "Отменить несохранённые изменения?",
+                        "Saxlanmamış təklif düzəlişləri silinsin?",
+                      ),
+                    )
+                  )
+                    return;
+                  setOfferDirty(false);
+                  setView(title as string);
+                }}
               >
                 <I size={18} />
                 {names[title as string]}
@@ -365,6 +388,18 @@ function App() {
         <button
           className="logout"
           onClick={() => {
+            if (
+              offerDirty &&
+              !window.confirm(
+                t(
+                  "Discard unsaved offer edits?",
+                  "Отменить несохранённые изменения?",
+                  "Saxlanmamış təklif düzəlişləri silinsin?",
+                ),
+              )
+            )
+              return;
+            setOfferDirty(false);
             setAuth("");
             setData(null);
             setCatalog([]);
@@ -406,9 +441,9 @@ function App() {
         )}
         <p className="notice">
           {t(
-            "Review availability before approval. Customer payment opens only after your approval. All payments are demos.",
-            "Проверьте доступность до одобрения. Оплата клиента доступна только после вашего решения. Платежи демонстрационные.",
-            "Təsdiqdən əvvəl mövcudluğu yoxlayın. Müştərinin ödənişi yalnız təsdiqinizdən sonra açılır. Bütün ödənişlər demodur.",
+            "Review suppliers and service terms before sending an offer. Sending an offer does not open payment.",
+            "Проверьте поставщиков и условия услуг перед отправкой предложения. Отправка не открывает оплату.",
+            "Təklif göndərməzdən əvvəl təchizatçıları və xidmət şərtlərini yoxlayın. Təklif göndərmək ödəniş açmır.",
           )}
         </p>
         {view === "Overview" && (
@@ -457,191 +492,14 @@ function App() {
           </>
         )}
         {view === "Bookings" && (
-          <>
-            <div className="queue-filter">
-              <label>
-                {t("Status", "Статус", "Status")}
-                <select
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                >
-                  <option value="ALL">{t("All", "Все", "Hamısı")}</option>
-                  {Object.entries(statuses).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p>
-                {t(
-                  "Availability may be checked manually while partner integrations are being connected.",
-                  "Наличие можно проверить вручную до подключения партнёров.",
-                  "Partnyor inteqrasiyaları qoşulana qədər mövcudluğu manual yoxlaya bilərsiniz.",
-                )}
-              </p>
-            </div>
-            {reservations
-              .filter((b) => filter === "ALL" || b.status === filter)
-              .map((b) => (
-                <article key={b.id} className="reservation">
-                  <div className="reservation-title">
-                    <div>
-                      <small>{b.id}</small>
-                      <h2>
-                        {(() => {
-                          try {
-                            const input = JSON.parse(b.quotePayload).input;
-                            if (input.customDays) return t("Custom journey", "Индивидуальный маршрут", "Fərdi səfər");
-                            const slug = input.slug;
-                            const tour = catalog.find((t) => t.slug === slug);
-                            return tour
-                              ? locale === "az"
-                                ? tour.titleAz
-                                : locale === "ru"
-                                  ? tour.titleRu
-                                  : tour.titleEn
-                              : b.title;
-                          } catch {
-                            return b.title;
-                          }
-                        })()}
-                      </h2>
-                      <p>
-                        {b.departure} · {b.total} {b.currency} ·{" "}
-                        {t("Paid", "Оплачено", "Ödənilib")}: {b.paid}{" "}
-                        {b.currency}
-                      </p>
-                    </div>
-                    <strong className="state">{statuses[b.status]}</strong>
-                  </div>
-                  <p className="customer-note">
-                    {b.customerNote ||
-                      t(
-                        "No special notes.",
-                        "Без пожеланий.",
-                        "Xüsusi qeyd yoxdur.",
-                      )}
-                  </p>
-                  <details>
-                    <summary>
-                      {t(
-                        "Service choices",
-                        "Выбранные услуги",
-                        "Xidmət seçimləri",
-                      )}
-                    </summary>
-                    <QuoteDetails booking={b} t={t} />
-                  </details>
-                  {b.operatorNote && (
-                    <p>
-                      {t("Office response", "Ответ офиса", "Ofisin cavabı")}:{" "}
-                      {b.operatorNote}
-                    </p>
-                  )}
-                  {b.status === "PENDING_REVIEW" && (
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        const f = new FormData(e.currentTarget);
-                        const submitter = (e.nativeEvent as SubmitEvent)
-                          .submitter as HTMLButtonElement;
-                        void decision(
-                          "/api/v1/operations/bookings/" + b.id + "/review",
-                          submitter.value === "approve",
-                          String(f.get("note")),
-                        );
-                      }}
-                    >
-                      <label>
-                        {t(
-                          "Availability check and response to customer",
-                          "Проверка наличия и ответ клиенту",
-                          "Mövcudluq yoxlaması və müştəriyə cavab",
-                        )}
-                        <textarea
-                          name="note"
-                          minLength={3}
-                          maxLength={2000}
-                          required
-                          rows={3}
-                        />
-                      </label>
-                      <div className="decision-actions">
-                        <button name="decision" value="approve" disabled={busy}>
-                          {t(
-                            "Approve · allow demo payment",
-                            "Одобрить · открыть демо-оплату",
-                            "Təsdiqlə · demo ödənişi aç",
-                          )}
-                        </button>
-                        <button
-                          name="decision"
-                          value="reject"
-                          disabled={busy}
-                          className="reject"
-                        >
-                          {t("Reject request", "Отклонить", "Sorğunu rədd et")}
-                        </button>
-                      </div>
-                    </form>
-                  )}
-                  {b.status === "CANCELLED" && b.paid > 0 && (
-                    <p className="error">
-                      {t(
-                        "Manual refund review required. Demo funds only.",
-                        "Нужна ручная проверка возврата. Только демо-средства.",
-                        "Manual geri ödəniş yoxlaması tələb olunur. Yalnız demo məbləğidir.",
-                      )}
-                    </p>
-                  )}
-                  <button
-                    className="history-button"
-                    onClick={async () => {
-                      try {
-                        const events = await api<Audit[]>(
-                          "/api/v1/operations/bookings/" + b.id + "/audit",
-                          auth,
-                        );
-                        setHistory((h) => ({ ...h, [b.id]: events }));
-                      } catch (e) {
-                        setError(problem(e));
-                      }
-                    }}
-                  >
-                    {t(
-                      "Show audit history",
-                      "История действий",
-                      "Əməliyyat tarixçəsini göstər",
-                    )}
-                  </button>
-                  {history[b.id] && (
-                    <ol className="audit">
-                      {history[b.id].map((event, i) => (
-                        <li key={i}>
-                          <strong>{event.action}</strong> · {event.actor}
-                          <p>{event.note}</p>
-                          <small>
-                            {new Date(event.created_at).toLocaleString()}
-                          </small>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                </article>
-              ))}
-            {!reservations.some(
-              (b) => filter === "ALL" || b.status === filter,
-            ) && (
-              <div className="empty">
-                {t(
-                  "No matching reservations.",
-                  "Нет подходящих бронирований.",
-                  "Bu statusda rezervasiya yoxdur.",
-                )}
-              </div>
-            )}
-          </>
+          <OfferWorkspace
+            auth={auth}
+            locale={locale}
+            bookings={reservations}
+            requests={inbox}
+            catalog={catalog}
+            onDirtyChange={setOfferDirty}
+          />
         )}
         {view === "Requests" && (
           <>

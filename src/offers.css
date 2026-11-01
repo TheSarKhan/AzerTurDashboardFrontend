@@ -1,0 +1,585 @@
+body {
+  background: #faf8f4;
+}
+.shell {
+  grid-template-columns: 200px minmax(0, 1fr);
+}
+.shell > aside {
+  background: #fff;
+  color: #202c24;
+  border-right: 1px solid #dce1d6;
+  padding: 28px 20px;
+}
+.shell > aside .workspace {
+  color: #687364;
+}
+.shell > aside nav button {
+  color: #354637;
+  padding: 12px 10px;
+  border-radius: 2px;
+  font-size: 13px;
+  gap: 12px;
+}
+.shell > aside nav .active {
+  background: #f9eee4;
+  color: #ae4c24;
+  border-left: 3px solid #ee7845;
+}
+.shell > aside .logout {
+  color: #354637;
+}
+.shell > main {
+  padding: 28px 32px;
+  min-width: 0;
+}
+.shell > main > header {
+  border-bottom: 1px solid #dce1d6;
+  padding-bottom: 20px;
+}
+.shell > main > header h1 {
+  font-size: 28px;
+  letter-spacing: -1px;
+}
+.shell > main > header p {
+  display: none;
+}
+.shell > main > .notice {
+  padding: 12px 0;
+  font-size: 12px;
+}
+.ow {
+  font-size: 14px;
+  color: #1d2b22;
+  line-height: 1.6;
+}
+.ow :is(h1, h2, h3) {
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+}
+.ow h1 {
+  font-size: 36px;
+  margin: 0 0 12px;
+}
+.ow h2 {
+  font-size: 24px;
+  margin: 0 0 18px;
+}
+.ow h3 {
+  font-size: 17px;
+  margin: 0 0 18px;
+}
+.ow h2 > span {
+  color: #58725d;
+  font-weight: 400;
+  margin-right: 18px;
+}
+.ow p {
+  color: #64705f;
+  margin: 10px 0 18px;
+}
+.ow small {
+  display: block;
+  color: #6e7867;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.ow label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin: 14px 0;
+}
+.ow :is(input, select, textarea) {
+  font: inherit;
+  color: inherit;
+  background: #fff;
+  border: 1px solid #d8dfd1;
+  border-radius: 3px;
+  min-height: 42px;
+  width: 100%;
+  padding: 10px 12px;
+  margin-top: 6px;
+}
+.ow textarea {
+  resize: vertical;
+}
+.ow input[readonly] {
+  background: #f2f3ed;
+}
+.ow :is(button, a, input, select, textarea, summary):focus-visible {
+  outline: 3px solid #b55029;
+  outline-offset: 3px;
+}
+.ow button:disabled {
+  cursor: not-allowed;
+}
+.ow .ow-primary,
+.ow .ow-outline,
+.ow .ow-link {
+  font: inherit;
+  min-height: 42px;
+  border-radius: 3px;
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 12px;
+}
+.ow .ow-primary {
+  background: #ed7b47;
+  color: #182e20;
+  padding: 11px 18px;
+  border: 1px solid transparent;
+}
+.ow .ow-outline {
+  background: transparent;
+  color: #294330;
+  padding: 10px 17px;
+  border: 1px solid #728571;
+}
+.ow .ow-link {
+  background: none;
+  border: 0;
+  color: #263e2d;
+  padding: 4px 0;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  font-weight: 400;
+}
+.ow-primary:disabled {
+  background: #d9dcd5 !important;
+  color: #697164 !important;
+  opacity: 0.8;
+}
+.ow-queue-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  margin: 25px 0;
+}
+.ow-queue-heading input {
+  max-width: 300px;
+}
+.ow-table-scroll {
+  overflow: auto;
+  max-width: 100%;
+  border: 1px solid #d8dfd1;
+  border-radius: 3px;
+}
+.ow table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0;
+  background: white;
+  font-size: 12px;
+}
+.ow th {
+  text-align: left;
+  background: #f6f7f1;
+  font-weight: 600;
+}
+.ow :is(th, td) {
+  padding: 13px 12px;
+  border-bottom: 1px solid #e0e4d8;
+  vertical-align: middle;
+  white-space: normal;
+}
+.ow table td span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+.ow table .ow-link {
+  font-size: 11px;
+  min-height: 36px;
+}
+.ow table tfoot td,
+.ow table tfoot th {
+  background: #e9eddf;
+  font-size: 18px;
+}
+.ow-service-name {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-width: 145px;
+}
+.ow-service-name svg {
+  flex-shrink: 0;
+}
+.ow-heading {
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  align-items: center;
+  margin: 25px 0 20px;
+}
+.ow-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ow-facts {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 0.6fr 0.8fr;
+  background: #e9eddf;
+  padding: 22px;
+  gap: 20px;
+}
+.ow-facts > div {
+  border-right: 1px solid #d2dacb;
+}
+.ow-facts > div:last-child {
+  border: 0;
+}
+.ow-facts strong {
+  display: block;
+  font-size: 14px;
+}
+.ow-tabs {
+  display: flex;
+  gap: 26px;
+  border-bottom: 1px solid #d8dfd1;
+  margin: 12px 0 24px;
+}
+.ow-tabs button {
+  background: none;
+  color: #2b4230;
+  border-radius: 0;
+  font-size: 13px;
+  padding: 10px 0;
+  border-bottom: 3px solid transparent;
+}
+.ow-tabs button[aria-pressed="true"] {
+  border-color: #ed7b47;
+  font-weight: 700;
+}
+.ow-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 28px;
+  align-items: start;
+}
+.ow-grid section {
+  margin: 22px 0 32px;
+}
+.ow-day {
+  border: 1px solid #d8dfd1;
+  border-radius: 3px;
+  background: #fff;
+  padding: 14px 18px;
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin: 12px 0;
+  font-size: 12px;
+}
+.ow-day strong {
+  flex-shrink: 0;
+}
+.ow-day textarea {
+  min-height: 50px;
+}
+.ow-day select {
+  max-width: 130px;
+}
+.ow-read-note {
+  border: 1px solid #d8dfd1;
+  background: white;
+  padding: 18px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ow-summary {
+  position: sticky;
+  top: 20px;
+  padding: 0 !important;
+  background: none !important;
+  color: inherit !important;
+  display: block !important;
+}
+.ow-summary > div {
+  border: 1px solid #d8dfd1;
+  background: white;
+  border-radius: 3px;
+  padding: 22px;
+  margin-bottom: 22px;
+}
+.ow-summary h2 {
+  font-size: 22px;
+}
+.ow-summary-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  font-size: 12px;
+  margin: 12px 0;
+}
+.ow-summary-line > span {
+  min-width: 0;
+}
+.ow-summary-line > strong {
+  white-space: nowrap;
+}
+.ow-total {
+  border-top: 1px solid #d8dfd1;
+  padding-top: 20px;
+  margin-top: 20px;
+  font-size: 15px;
+}
+.ow-total > strong:last-child {
+  font-size: 22px;
+}
+.ow-summary p {
+  font-size: 12px;
+}
+.ow-summary p svg {
+  display: inline;
+  vertical-align: middle;
+}
+.ow-good {
+  color: #276040 !important;
+}
+.ow-missing {
+  color: #a84b25 !important;
+}
+.ow-sage {
+  padding: 16px;
+  background: #e9eddf;
+  font-size: 12px;
+  margin: 18px 0;
+  line-height: 1.6;
+  border-radius: 2px;
+}
+.ow-footer {
+  border: 1px solid #d8dfd1;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+  margin: 28px 0 0;
+  font-size: 12px;
+}
+.ow-error {
+  background: #fff0e5;
+  border-left: 3px solid #b75326;
+  padding: 16px;
+  color: #8a3d20 !important;
+}
+.ow-notice {
+  background: #e9eddf;
+  padding: 16px;
+  color: #294b34 !important;
+}
+.ow-dialog {
+  position: fixed;
+  margin: auto;
+  width: calc(100% - 40px);
+  max-width: 940px;
+  max-height: 90dvh;
+  overflow: auto;
+  border: 0;
+  border-radius: 5px;
+  background: #faf8f4;
+  padding: 34px;
+  color: #202c24;
+}
+.ow-dialog::backdrop {
+  background: rgb(18 28 22 / 0.55);
+}
+.ow-dialog h2 {
+  padding-right: 24px;
+}
+.ow-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  color: #283f2d;
+  padding: 6px;
+}
+.ow-editor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px 30px;
+}
+.ow-editor-grid > div + div {
+  border-left: 1px solid #d8dfd1;
+  padding-left: 30px;
+}
+.ow-dialog-actions {
+  justify-content: flex-end;
+  margin-top: 22px;
+}
+.ow-fields {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 22px;
+}
+.ow-preview-service {
+  border-bottom: 1px solid #d8dfd1;
+  padding: 12px 0;
+}
+.ow-preview-service p,
+.ow-dialog > p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ow-audit {
+  border: 1px solid #d8dfd1;
+  padding: 16px;
+  margin: 14px 0;
+  font-size: 12px;
+}
+.ow summary {
+  cursor: pointer;
+}
+.ow input[type="search"] {
+  min-height: 42px;
+}
+@media (max-width: 1200px) {
+  .ow-grid {
+    grid-template-columns: minmax(0, 1fr) 260px;
+    gap: 20px;
+  }
+  .shell > main {
+    padding: 24px;
+  }
+  .ow-heading {
+    display: block;
+  }
+  .ow-heading > .ow-actions {
+    margin: 16px 0;
+  }
+  .ow th,
+  .ow td {
+    padding: 10px 8px;
+  }
+}
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 160px minmax(0, 1fr);
+  }
+  .shell > aside {
+    padding: 20px 12px;
+  }
+  .ow-grid {
+    display: flex;
+    flex-direction: column;
+  }
+  .ow-grid > div,
+  .ow-summary {
+    width: 100%;
+  }
+  .ow-summary {
+    position: static;
+  }
+  .ow-facts {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ow-footer {
+    flex-wrap: wrap;
+  }
+  .ow-table-scroll table {
+    min-width: 680px;
+  }
+}
+@media (max-width: 650px) {
+  .shell {
+    display: block;
+  }
+  .shell > aside {
+    position: static;
+  }
+  .shell > aside nav {
+    margin-top: 15px;
+    display: flex;
+    overflow: auto;
+    gap: 8px;
+  }
+  .shell > aside nav button {
+    flex-shrink: 0;
+  }
+  .shell > aside .logout {
+    margin-top: 12px;
+  }
+  .shell > main {
+    padding: 20px 16px;
+  }
+  .ow h1 {
+    font-size: 30px;
+  }
+  .ow-heading {
+    margin-top: 18px;
+  }
+  .ow h2 {
+    font-size: 23px;
+  }
+  .ow-facts {
+    padding: 16px;
+    gap: 16px;
+  }
+  .ow-facts > div {
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+  .ow-day {
+    display: block;
+  }
+  .ow-day select {
+    max-width: none;
+  }
+  .ow-editor-grid {
+    grid-template-columns: 1fr;
+  }
+  .ow-editor-grid > div + div {
+    border: 0;
+    padding: 0;
+  }
+  .ow-dialog {
+    max-height: 93dvh;
+    width: 100%;
+    margin: auto 0 0;
+    padding: 30px 20px;
+    border-radius: 12px 12px 0 0;
+  }
+  .ow-queue-heading {
+    display: block;
+  }
+  .ow-fields {
+    grid-template-columns: 1fr;
+  }
+  .ow-summary-line {
+    gap: 12px;
+  }
+  .ow-facts small {
+    font-size: 10px;
+  }
+}
+.shell .brand {
+  font-size: 24px;
+  letter-spacing: -1px;
+  white-space: nowrap;
+}
+.shell .brand .ow-brand-mark {
+  font-size: 36px;
+  font-weight: 800;
+  font-style: italic;
+  color: #e66d38;
+  letter-spacing: -3px;
+  margin-right: 5px;
+}
+.shell > aside nav button > span {
+  background: none;
+  border: 0;
+  color: inherit;
+  padding: 0;
+  font-size: 12px;
+  border-radius: 0;
+}

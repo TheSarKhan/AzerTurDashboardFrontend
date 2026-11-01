@@ -13,4 +13,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: |
+          node --experimental-strip-types tests/offer-pricing.mjs
           npm run build
