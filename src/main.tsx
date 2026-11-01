@@ -491,7 +491,9 @@ function App() {
                       <h2>
                         {(() => {
                           try {
-                            const slug = JSON.parse(b.quotePayload).input.slug;
+                            const input = JSON.parse(b.quotePayload).input;
+                            if (input.customDays) return t("Custom journey", "Индивидуальный маршрут", "Fərdi səfər");
+                            const slug = input.slug;
                             const tour = catalog.find((t) => t.slug === slug);
                             return tour
                               ? locale === "az"
