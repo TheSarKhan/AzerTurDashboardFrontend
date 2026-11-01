@@ -418,3 +418,49 @@ td small {
   border-top: 1px solid #d8ddd5;
   padding-top: 12px;
 }
+
+.workspace.who {
+  margin-top: 6px;
+  line-height: 1.4;
+  word-break: break-all;
+}
+.staff-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  align-items: end;
+  margin: 28px 0;
+  padding: 24px;
+  background: white;
+  border: 1px solid #d8ddd5;
+  border-radius: 8px;
+}
+.staff-form label {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+}
+.staff-form input {
+  margin-top: 0;
+}
+.staff-form select,
+td select {
+  background: white;
+  border: 1px solid #d8ddd5;
+  border-radius: 4px;
+  padding: 10px;
+  color: #222923;
+  font: inherit;
+}
+.row-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+button.small {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+button.danger {
+  background: #b54126;
+}

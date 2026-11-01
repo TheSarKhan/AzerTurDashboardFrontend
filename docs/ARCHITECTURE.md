@@ -27,7 +27,7 @@ The immutable original quote key keeps reservation retries idempotent even after
 - Office: `POST /operations/bookings/{id}/review`; `POST /operations/requests/{id}/resolve`.
 - Office: `GET /operations/bookings/{id}/audit`.
 
-Swagger `/swagger-ui.html`, schema `/v3/api-docs`. The website BFF restricts routes, checks same-origin writes, redacts access tokens and proxies only customer endpoints. Native and dashboard use configurable direct API addresses. Office sign-in remains the environment-provided HTTP Basic foundation; individual staff identity/admin provisioning is still production work.
+Swagger `/swagger-ui.html`, schema `/v3/api-docs`. The website BFF restricts routes, checks same-origin writes, redacts access tokens and proxies only customer endpoints. Native and dashboard use configurable direct API addresses. Office staff sign in with individual email and password accounts and `OPERATOR`/`ADMIN` roles; administrators manage accounts in the dashboard. Staff email verification and password recovery are still production work.
 
 ## Before production
 
