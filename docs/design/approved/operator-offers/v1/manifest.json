@@ -1,0 +1,36 @@
+{
+  "status": "approved-and-implemented",
+  "date": "2026-11-01",
+  "generator": "built-in GPT Images",
+  "scope": "Office operations: request review, offer composer and individual service editor",
+  "assets": [
+    {
+      "file": "request-review-desktop.png",
+      "width": 1317,
+      "height": 1194
+    },
+    {
+      "file": "offer-composer-desktop.png",
+      "width": 1199,
+      "height": 1312
+    },
+    {
+      "file": "service-editor-desktop.png",
+      "width": 1536,
+      "height": 1024
+    }
+  ],
+  "sample": {
+    "currency": "EUR",
+    "total": 495,
+    "paid": 0,
+    "serviceLines": [
+      180,
+      110,
+      130,
+      35,
+      40
+    ]
+  },
+  "implementationChanged": false
+}
