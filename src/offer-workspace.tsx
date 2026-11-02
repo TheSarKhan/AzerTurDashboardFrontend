@@ -702,7 +702,7 @@ export default function OfferWorkspace({
               {t("Activity", "История", "Tarixçə")}
             </button>
           </div>
-          {sentVersion > 0 && <ContractWorkspace bookingId={b.id} auth={auth} locale={l} />}
+          {sentVersion > 0 && <ContractWorkspace key={b.id} bookingId={b.id} auth={auth} locale={l} />}
           {audit.length > 0 && (
             <details open className="ow-audit">
               <summary>
