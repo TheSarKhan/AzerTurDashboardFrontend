@@ -1,3 +1,4 @@
+import PaymentWorkspace from "./payment-workspace";
 import ContractWorkspace from "./contract-workspace";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -133,6 +134,7 @@ export default function OfferWorkspace({
       return item.title;
     }
   }
+  const [paymentDirty,setPaymentDirty] = useState(false);
   const [reject, setReject] = useState(false);
   const [freshBooking, setFreshBooking] = useState<Booking | null>(null);
   const [selected, setSelected] = useState<string | null>(null),
@@ -257,7 +259,7 @@ export default function OfferWorkspace({
       setLoading(false);
     }
   }
-  useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
+  useEffect(() => onDirtyChange(dirty || paymentDirty), [dirty, paymentDirty, onDirtyChange]);
   useEffect(() => {
     if (selected) void load(selected);
   }, [selected]);
@@ -703,6 +705,7 @@ export default function OfferWorkspace({
             </button>
           </div>
           {sentVersion > 0 && <ContractWorkspace key={b.id} bookingId={b.id} auth={auth} locale={l} />}
+          {sentVersion > 0 && <PaymentWorkspace key={b.id} bookingId={b.id} auth={auth} locale={l} onDirtyChange={setPaymentDirty} />}
           {audit.length > 0 && (
             <details open className="ow-audit">
               <summary>
