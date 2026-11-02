@@ -1,3 +1,4 @@
+import ContractWorkspace from "./contract-workspace";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -701,6 +702,7 @@ export default function OfferWorkspace({
               {t("Activity", "История", "Tarixçə")}
             </button>
           </div>
+          {sentVersion > 0 && <ContractWorkspace bookingId={b.id} auth={auth} locale={l} />}
           {audit.length > 0 && (
             <details open className="ow-audit">
               <summary>
