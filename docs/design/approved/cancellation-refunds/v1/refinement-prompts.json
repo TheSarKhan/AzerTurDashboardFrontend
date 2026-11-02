@@ -1,0 +1,10 @@
+[
+  {
+    "name": "customer-result-desktop-refined.png",
+    "prompt": "Edit this exact UI screenshot. Preserve all layout, style, imagery, amounts and other text. Correct the Request received value to '12 May 2027, 14:30 (Baku time)'. Change agreed policy version from a global AzerTur Standard Terms to 'Service-specific agreed policies' and description 'View the applicable terms under each service'. Change timeline Request reviewed date to '13 May 2027, 11:02' and Cancellation approved to '13 May 2027, 15:18'. In the refund summary remove the sentence that final amounts may vary based on payment method; replace it with 'Approved refund: €154. Funds have not yet been transferred.' Do not invent refund completion deadlines. Keep everything else exactly unchanged."
+  },
+  {
+    "name": "customer-mobile-refined.png",
+    "prompt": "Edit this exact two-screen mobile UI screenshot. Preserve all layout, style, imagery, service numbers and amounts. On the RIGHT screen change Request reviewed date to '13 May 2027, 11:02' and Cancellation approved date to '13 May 2027, 15:18'. Replace the text 'The transfer will be completed soon.' beneath the final pending Funds returned step with 'We will update you after the transfer.' There is no promised completion date. Keep all other content and layout unchanged."
+  }
+]
