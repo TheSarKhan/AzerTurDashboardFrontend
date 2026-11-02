@@ -131,7 +131,7 @@ function App() {
     [inbox, setInbox] = useState<BookingRequest[]>([]),
     [outbox, setOutbox] = useState<Notification[]>([]),
     [auth, setAuth] = useState(""),
-    [view, setView] = useState("Overview"),
+    [view, setView] = useState("Bookings"),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [locale, setLocale] = useState<Locale>("az"),
@@ -149,7 +149,7 @@ function App() {
     Overview: t("Overview", "Обзор", "İcmal"),
     Tours: t("Tours", "Туры", "Turlar"),
     Quotes: t("Quotes", "Расчёты", "Qiymət sorğuları"),
-    Bookings: t("Travel requests", "Заявки на поездки", "Səfər sorğuları"),
+    Bookings: t("Requests", "Заявки", "Sorğular"),
     Requests: t("Customer requests", "Запросы клиентов", "Müştəri sorğuları"),
     Notifications: t("Notifications", "Уведомления", "Bildirişlər"),
   };
@@ -382,7 +382,7 @@ function App() {
               >
                 <I size={18} />
                 {names[title as string]}
-                {title === "Bookings" && pending > 0 && <span>{pending}</span>}
+
               </button>
             );
           })}

@@ -1,3 +1,4 @@
+import RequestWorkspace from "./request-workspace";
 import PaymentWorkspace from "./payment-workspace";
 import ContractWorkspace from "./contract-workspace";
 import { useEffect, useRef, useState } from "react";
@@ -401,98 +402,7 @@ export default function OfferWorkspace({
     setError("");
     setNotice("");
   }
-  if (!selected)
-    return (
-      <div className="ow">
-        <div className="ow-queue-heading">
-          <h2>{t("Request queue", "Очередь заявок", "Sorğu növbəsi")}</h2>
-          <input
-            type="search"
-            aria-label={t("Search requests", "Поиск заявок", "Sorğu axtar")}
-            placeholder={t(
-              "Reference or title",
-              "Номер или название",
-              "Nömrə və ya başlıq",
-            )}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="ow-table-scroll">
-          <table>
-            <thead>
-              <tr>
-                {[
-                  t("Request", "Заявка", "Sorğu"),
-                  t("Travel date", "Дата поездки", "Səfər tarixi"),
-                  t("Status", "Статус", "Status"),
-                  t("Total", "Сумма", "Cəm"),
-                  t("Action", "Действие", "Əməliyyat"),
-                ].map((x) => (
-                  <th key={x}>{x}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {bookings
-                .filter((x) =>
-                  (x.id + x.title).toLowerCase().includes(search.toLowerCase()),
-                )
-                .map((x) => (
-                  <tr key={x.id}>
-                    <td>
-                      <strong>{bookingName(x)}</strong>
-                      <small>{x.id.slice(0, 8)}</small>
-                    </td>
-                    <td>{x.departure}</td>
-                    <td>
-                      {{
-                        PENDING_REVIEW: t(
-                          "Needs review",
-                          "На проверке",
-                          "Yoxlama gözləyir",
-                        ),
-                        AWAITING_PAYMENT: t(
-                          "Awaiting demo payment",
-                          "Ожидает демо-оплаты",
-                          "Demo ödəniş gözlənilir",
-                        ),
-                        CONFIRMED: t(
-                          "Confirmed",
-                          "Подтверждено",
-                          "Təsdiqlənib",
-                        ),
-                        REJECTED: t("Rejected", "Отклонено", "Rədd edilib"),
-                        CANCELLED: t("Cancelled", "Отменено", "Ləğv edilib"),
-                      }[x.status] || x.status}
-                    </td>
-                    <td>
-                      {x.total} {x.currency}
-                    </td>
-                    <td>
-                      <button
-                        className="ow-link"
-                        onClick={() => {
-                          setMode("review");
-                          setSelected(x.id);
-                        }}
-                      >
-                        {t("Open request", "Открыть заявку", "Sorğunu aç")}
-                        <ArrowRight size={15} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
-        {!bookings.length && (
-          <p>
-            {t("No requests yet.", "Пока нет заявок.", "Hələ sorğu yoxdur.")}
-          </p>
-        )}
-      </div>
-    );
+  if (!selected) return <RequestWorkspace auth={auth} refreshKey={bookings} locale={l} onOpen={id=>{setMode("review");setSelected(id);}}/>;
   return (
     <div className="ow">
       <button className="ow-link" disabled={busy} onClick={back}>
