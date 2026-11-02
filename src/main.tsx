@@ -1,3 +1,4 @@
+import CancellationWorkspace from "./cancellation-workspace";
 import React, { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -123,6 +124,7 @@ function QuoteDetails({
 
 function App() {
   const [offerDirty, setOfferDirty] = useState(false);
+  const [cancelRequestId, setCancelRequestId] = useState<string | null>(null);
   const [data, setData] = useState<Overview | null>(null),
     [catalog, setCatalog] = useState<Tour[]>([]),
     [reservations, setReservations] = useState<Booking[]>([]),
@@ -367,7 +369,7 @@ function App() {
                     title !== view &&
                     !window.confirm(
                       t(
-                        "Discard unsaved offer edits?",
+                        "Discard unsaved changes?",
                         "Отменить несохранённые изменения?",
                         "Saxlanmamış təklif düzəlişləri silinsin?",
                       ),
@@ -392,7 +394,7 @@ function App() {
               offerDirty &&
               !window.confirm(
                 t(
-                  "Discard unsaved offer edits?",
+                  "Discard unsaved changes?",
                   "Отменить несохранённые изменения?",
                   "Saxlanmamış təklif düzəlişləri silinsin?",
                 ),
@@ -501,232 +503,260 @@ function App() {
             onDirtyChange={setOfferDirty}
           />
         )}
-        {view === "Requests" && (
-          <>
-            <p>
-              {t(
-                "Staff handle every change and cancellation. For changes, describe the agreed arrangement in the response.",
-                "Все изменения и отмены обрабатывает сотрудник. Для изменений опишите согласованный вариант в ответе.",
-                "Hər dəyişiklik və ləğvi əməkdaş idarə edir. Dəyişiklik üçün razılaşdırılmış detalları cavabda qeyd edin.",
-              )}
-            </p>
-            {inbox.map((r) => (
-              <article key={r.id} className="reservation">
-                <small>{r.bookingId}</small>
-                <h2>
-                  {r.kind === "CANCEL"
-                    ? t("Cancellation", "Отмена", "Ləğv")
-                    : t(
-                        "Change request",
-                        "Изменение",
-                        "Dəyişiklik sorğusu",
-                      )}{" "}
-                  · {r.status}
-                </h2>
-                <p className="customer-note">{r.message}</p>
-                {r.response && <p>{r.response}</p>}
-                {r.status === "PENDING" && r.kind === "CHANGE" && (
-                  <details>
-                    <summary>
+        {view === "Requests" &&
+          cancelRequestId &&
+          inbox.find((r) => r.id === cancelRequestId) && (
+            <CancellationWorkspace
+              key={cancelRequestId}
+              request={inbox.find((r) => r.id === cancelRequestId)!}
+              auth={auth}
+              locale={locale}
+              onBack={() => setCancelRequestId(null)}
+              onDone={() => void load(auth)}
+              onDirtyChange={setOfferDirty}
+            />
+          )}
+        {view === "Requests" &&
+          !(cancelRequestId && inbox.find((r) => r.id === cancelRequestId)) && (
+            <>
+              <p>
+                {t(
+                  "Staff handle every change and cancellation. For changes, describe the agreed arrangement in the response.",
+                  "Все изменения и отмены обрабатывает сотрудник. Для изменений опишите согласованный вариант в ответе.",
+                  "Hər dəyişiklik və ləğvi əməkdaş idarə edir. Dəyişiklik üçün razılaşdırılmış detalları cavabda qeyd edin.",
+                )}
+              </p>
+              {inbox.map((r) => (
+                <article key={r.id} className="reservation">
+                  <small>{r.bookingId}</small>
+                  <h2>
+                    {r.kind === "CANCEL"
+                      ? t("Cancellation", "Отмена", "Ləğv")
+                      : t(
+                          "Change request",
+                          "Изменение",
+                          "Dəyişiklik sorğusu",
+                        )}{" "}
+                    · {r.status}
+                  </h2>
+                  <p className="customer-note">{r.message}</p>
+                  {r.kind === "CANCEL" && (
+                    <button onClick={() => setCancelRequestId(r.id)}>
                       {t(
-                        "Prepare revised dates and pricing",
-                        "Обновить даты и стоимость",
-                        "Yeni tarix və qiyməti hazırla",
+                        "Review cancellation",
+                        "Проверить отмену",
+                        "Ləğvə bax",
                       )}
-                    </summary>
-                    <form
-                      onChange={() =>
-                        setAmendments((current) => {
-                          const next = { ...current };
-                          delete next[r.id];
-                          return next;
-                        })
-                      }
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        if (busy) return;
-                        const f = new FormData(e.currentTarget);
-                        const booking = reservations.find(
-                          (b) => b.id === r.bookingId,
-                        );
-                        if (!booking) return;
-                        setBusy(true);
-                        setError("");
-                        try {
-                          const input = JSON.parse(booking.quotePayload).input;
-                          const q = await api<{
-                            id: string;
-                            total: number;
-                            currency: string;
-                          }>("/api/v1/quotes", auth, {
-                            ...input,
-                            date: f.get("date"),
-                            pax: Number(f.get("pax")),
-                            hotel: f.get("hotel"),
-                          });
-                          setAmendments((a) => ({ ...a, [r.id]: q }));
-                        } catch (e) {
-                          setError(problem(e));
-                        } finally {
-                          setBusy(false);
+                    </button>
+                  )}
+                  {r.response && <p>{r.response}</p>}
+                  {r.status === "PENDING" && r.kind === "CHANGE" && (
+                    <details>
+                      <summary>
+                        {t(
+                          "Prepare revised dates and pricing",
+                          "Обновить даты и стоимость",
+                          "Yeni tarix və qiyməti hazırla",
+                        )}
+                      </summary>
+                      <form
+                        onChange={() =>
+                          setAmendments((current) => {
+                            const next = { ...current };
+                            delete next[r.id];
+                            return next;
+                          })
                         }
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          if (busy) return;
+                          const f = new FormData(e.currentTarget);
+                          const booking = reservations.find(
+                            (b) => b.id === r.bookingId,
+                          );
+                          if (!booking) return;
+                          setBusy(true);
+                          setError("");
+                          try {
+                            const input = JSON.parse(
+                              booking.quotePayload,
+                            ).input;
+                            const q = await api<{
+                              id: string;
+                              total: number;
+                              currency: string;
+                            }>("/api/v1/quotes", auth, {
+                              ...input,
+                              date: f.get("date"),
+                              pax: Number(f.get("pax")),
+                              hotel: f.get("hotel"),
+                            });
+                            setAmendments((a) => ({ ...a, [r.id]: q }));
+                          } catch (e) {
+                            setError(problem(e));
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        <label>
+                          {t(
+                            "New departure",
+                            "Новая дата",
+                            "Yeni başlama tarixi",
+                          )}
+                          <input
+                            name="date"
+                            type="date"
+                            required
+                            defaultValue={
+                              reservations.find((b) => b.id === r.bookingId)
+                                ?.departure
+                            }
+                          />
+                        </label>
+                        <label>
+                          {t("Travellers", "Участники", "Səyahətçilər")}
+                          <input
+                            name="pax"
+                            type="number"
+                            min={1}
+                            max={12}
+                            defaultValue={(() => {
+                              try {
+                                return JSON.parse(
+                                  reservations.find((b) => b.id === r.bookingId)
+                                    ?.quotePayload || "{}",
+                                ).input.pax;
+                              } catch {
+                                return 2;
+                              }
+                            })()}
+                            required
+                          />
+                        </label>
+                        <label>
+                          {t(
+                            "Hotel category",
+                            "Категория отеля",
+                            "Otel kateqoriyası",
+                          )}
+                          <select
+                            name="hotel"
+                            defaultValue={(() => {
+                              try {
+                                return JSON.parse(
+                                  reservations.find((b) => b.id === r.bookingId)
+                                    ?.quotePayload || "{}",
+                                ).input.hotel;
+                              } catch {
+                                return "comfort";
+                              }
+                            })()}
+                          >
+                            <option value="standard">
+                              {t("Standard", "Стандарт", "Standart")}
+                            </option>
+                            <option value="comfort">
+                              {t("Comfort", "Комфорт", "Komfort")}
+                            </option>
+                            <option value="premium">Premium</option>
+                          </select>
+                        </label>
+                        <button disabled={busy}>
+                          {t(
+                            "Calculate revised quote",
+                            "Рассчитать новую цену",
+                            "Yeni qiyməti hesabla",
+                          )}
+                        </button>
+                      </form>
+                    </details>
+                  )}
+                  {amendments[r.id] && (
+                    <p className="customer-note">
+                      {t("Revised total", "Новая сумма", "Yenilənmiş məbləğ")}:{" "}
+                      {amendments[r.id].total} {amendments[r.id].currency} ·{" "}
+                      {amendments[r.id].id.slice(0, 8)}
+                    </p>
+                  )}
+                  {r.status === "PENDING" && (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const f = new FormData(e.currentTarget);
+                        const button = (e.nativeEvent as SubmitEvent)
+                          .submitter as HTMLButtonElement;
+                        if (
+                          button.value === "accept" &&
+                          r.kind === "CHANGE" &&
+                          !amendments[r.id]
+                        ) {
+                          setError(
+                            t(
+                              "Calculate a replacement quote before accepting a change.",
+                              "Рассчитайте новую цену перед принятием изменения.",
+                              "Dəyişikliyi qəbul etməzdən əvvəl yeni qiyməti hesablayın.",
+                            ),
+                          );
+                          return;
+                        }
+                        void decision(
+                          "/api/v1/operations/requests/" + r.id + "/resolve",
+                          button.value === "accept",
+                          String(f.get("note")),
+                          amendments[r.id]?.id,
+                        );
                       }}
                     >
                       <label>
                         {t(
-                          "New departure",
-                          "Новая дата",
-                          "Yeni başlama tarixi",
+                          "Response to customer",
+                          "Ответ клиенту",
+                          "Müştəriyə cavab",
                         )}
-                        <input
-                          name="date"
-                          type="date"
+                        <textarea
+                          name="note"
                           required
-                          defaultValue={
-                            reservations.find((b) => b.id === r.bookingId)
-                              ?.departure
-                          }
+                          minLength={3}
+                          maxLength={2000}
+                          rows={3}
                         />
                       </label>
-                      <label>
-                        {t("Travellers", "Участники", "Səyahətçilər")}
-                        <input
-                          name="pax"
-                          type="number"
-                          min={1}
-                          max={12}
-                          defaultValue={(() => {
-                            try {
-                              return JSON.parse(
-                                reservations.find((b) => b.id === r.bookingId)
-                                  ?.quotePayload || "{}",
-                              ).input.pax;
-                            } catch {
-                              return 2;
-                            }
-                          })()}
-                          required
-                        />
-                      </label>
-                      <label>
-                        {t(
-                          "Hotel category",
-                          "Категория отеля",
-                          "Otel kateqoriyası",
-                        )}
-                        <select
-                          name="hotel"
-                          defaultValue={(() => {
-                            try {
-                              return JSON.parse(
-                                reservations.find((b) => b.id === r.bookingId)
-                                  ?.quotePayload || "{}",
-                              ).input.hotel;
-                            } catch {
-                              return "comfort";
-                            }
-                          })()}
+                      <div className="decision-actions">
+                        <button
+                          value="accept"
+                          disabled={busy || r.kind === "CANCEL"}
                         >
-                          <option value="standard">
-                            {t("Standard", "Стандарт", "Standart")}
-                          </option>
-                          <option value="comfort">
-                            {t("Comfort", "Комфорт", "Komfort")}
-                          </option>
-                          <option value="premium">Premium</option>
-                        </select>
-                      </label>
-                      <button disabled={busy}>
-                        {t(
-                          "Calculate revised quote",
-                          "Рассчитать новую цену",
-                          "Yeni qiyməti hesabla",
-                        )}
-                      </button>
+                          {t("Accept request", "Принять", "Sorğunu qəbul et")}
+                        </button>
+                        <button
+                          value="decline"
+                          className="reject"
+                          disabled={busy}
+                        >
+                          {t(
+                            "Decline request",
+                            "Отклонить",
+                            "Sorğunu qəbul etmə",
+                          )}
+                        </button>
+                      </div>
                     </form>
-                  </details>
-                )}
-                {amendments[r.id] && (
-                  <p className="customer-note">
-                    {t("Revised total", "Новая сумма", "Yenilənmiş məbləğ")}:{" "}
-                    {amendments[r.id].total} {amendments[r.id].currency} ·{" "}
-                    {amendments[r.id].id.slice(0, 8)}
-                  </p>
-                )}
-                {r.status === "PENDING" && (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const f = new FormData(e.currentTarget);
-                      const button = (e.nativeEvent as SubmitEvent)
-                        .submitter as HTMLButtonElement;
-                      if (
-                        button.value === "accept" &&
-                        r.kind === "CHANGE" &&
-                        !amendments[r.id]
-                      ) {
-                        setError(
-                          t(
-                            "Calculate a replacement quote before accepting a change.",
-                            "Рассчитайте новую цену перед принятием изменения.",
-                            "Dəyişikliyi qəbul etməzdən əvvəl yeni qiyməti hesablayın.",
-                          ),
-                        );
-                        return;
-                      }
-                      void decision(
-                        "/api/v1/operations/requests/" + r.id + "/resolve",
-                        button.value === "accept",
-                        String(f.get("note")),
-                        amendments[r.id]?.id,
-                      );
-                    }}
-                  >
-                    <label>
-                      {t(
-                        "Response to customer",
-                        "Ответ клиенту",
-                        "Müştəriyə cavab",
-                      )}
-                      <textarea
-                        name="note"
-                        required
-                        minLength={3}
-                        maxLength={2000}
-                        rows={3}
-                      />
-                    </label>
-                    <div className="decision-actions">
-                      <button value="accept" disabled={busy}>
-                        {t("Accept request", "Принять", "Sorğunu qəbul et")}
-                      </button>
-                      <button
-                        value="decline"
-                        className="reject"
-                        disabled={busy}
-                      >
-                        {t(
-                          "Decline request",
-                          "Отклонить",
-                          "Sorğunu qəbul etmə",
-                        )}
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </article>
-            ))}
-            {!inbox.length && (
-              <div className="empty">
-                {t(
-                  "No requests yet.",
-                  "Запросов пока нет.",
-                  "Hələ sorğu yoxdur.",
-                )}
-              </div>
-            )}
-          </>
-        )}
+                  )}
+                </article>
+              ))}
+              {!inbox.length && (
+                <div className="empty">
+                  {t(
+                    "No requests yet.",
+                    "Запросов пока нет.",
+                    "Hələ sorğu yoxdur.",
+                  )}
+                </div>
+              )}
+            </>
+          )}
         {view === "Notifications" && (
           <>
             <p>
