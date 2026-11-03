@@ -26,6 +26,7 @@ type Context = {
   offer: Offer | null;
   requests: Request[];
   paidMinor: number;
+  receivedMinor?: number;
   paymentBlocked: boolean;
 };
 type Draft = {
@@ -274,12 +275,7 @@ export default function PaymentWorkspace({
                   {t("Service payment", "Оплата услуги", "Xidmət ödənişi")}
                 </label>
                 {draft.kind === "SERVICE" &&
-                  !context.requests.some(
-                    (r) =>
-                      r.kind === "DEPOSIT" &&
-                      r.status === "PAID" &&
-                      r.contract_id === context.contract?.id,
-                  ) && (
+                  !(context.receivedMinor || context.paidMinor) && (
                     <p className="payment-error">
                       {t(
                         "The deposit must be paid before a service payment request can be sent.",
@@ -428,12 +424,7 @@ export default function PaymentWorkspace({
                   sent ||
                   context.paymentBlocked ||
                   (draft.kind === "SERVICE" &&
-                    !context.requests.some(
-                      (r) =>
-                        r.kind === "DEPOSIT" &&
-                        r.status === "PAID" &&
-                        r.contract_id === context.contract?.id,
-                    ))
+                    !(context.receivedMinor || context.paidMinor))
                 }
                 onClick={() => void send()}
               >

@@ -26,3 +26,7 @@ The customer registration, durable reservation request, office approval and demo
 ## Office workflows
 
 The dashboard includes named staff accounts and server-enforced roles, administrator assignment, partner/service catalogue management and partner inventory API keys, received-fund allocation in booking review, revised payment plans, refund tracking and notification delivery monitoring. See [setup, APIs and release boundaries](docs/OFFICE_WORKFLOWS.md). Implementation screenshots are archived in `docs/design/implemented/office-workflows/v1/`; the user-approved request dashboard remains in `docs/design/approved/operations-workspace/v1/`.
+
+## Account security and paid changes
+
+Email verification, password recovery and session revocation now protect customer writes. Paid changes use a separately reviewed proposal and exact PDF acceptance before the effective booking changes. See [setup, workflow and verification](docs/ACCOUNT_SECURITY_AMENDMENTS.md). This work is stacked on `feature/complete-office-workflows`; live delivery still needs the configured server SMTP environment.
