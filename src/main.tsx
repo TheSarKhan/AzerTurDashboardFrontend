@@ -1,3 +1,6 @@
+import OfficeManagement from "./office-management";
+import { RefundWorkspace } from "./finance-workspace";
+import { Handshake, Users, Wallet } from "lucide-react";
 import CancellationWorkspace from "./cancellation-workspace";
 import React, { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
@@ -123,6 +126,7 @@ function QuoteDetails({
 }
 
 function App() {
+  const [roles, setRoles] = useState<string[]>([]);
   const [offerDirty, setOfferDirty] = useState(false);
   const [cancelRequestId, setCancelRequestId] = useState<string | null>(null);
   const [data, setData] = useState<Overview | null>(null),
@@ -146,6 +150,9 @@ function App() {
     document.documentElement.lang = locale;
   }, [locale]);
   const names: Record<string, string> = {
+    Staff: t("Office staff", "Сотрудники", "Əməkdaşlar"),
+    Partners: t("Partners", "Партнёры", "Partnyorlar"),
+    Finance: t("Refunds", "Возвраты", "Geri ödənişlər"),
     Overview: t("Overview", "Обзор", "İcmal"),
     Tours: t("Tours", "Туры", "Turlar"),
     Quotes: t("Quotes", "Расчёты", "Qiymət sorğuları"),
@@ -217,6 +224,10 @@ function App() {
         requests(credentials),
         notifications(credentials),
       ]);
+      setRoles(
+        (await api<{ roles: string[] }>("/api/v1/operations/me", credentials))
+          .roles,
+      );
       setData(summary);
       setCatalog(list);
       setReservations(b);
@@ -356,6 +367,9 @@ function App() {
             [Map, "Tours"],
             [FileText, "Quotes"],
             [Bell, "Notifications"],
+            [Handshake, "Partners"],
+            [Wallet, "Finance"],
+            ...(roles.includes("ROLE_ADMIN") ? [[Users, "Staff"]] : []),
           ].map(([Icon, title]) => {
             const I = Icon as typeof Map;
             return (
@@ -382,7 +396,6 @@ function App() {
               >
                 <I size={18} />
                 {names[title as string]}
-
               </button>
             );
           })}
@@ -757,47 +770,21 @@ function App() {
               )}
             </>
           )}
-        {view === "Notifications" && (
-          <>
-            <p>
-              {t(
-                "Email uses Gmail SMTP when configured. WhatsApp and push are queued until their providers are connected. SMS is not used.",
-                "Email использует Gmail SMTP после настройки. WhatsApp и push ожидают подключения. SMS не используется.",
-                "Email konfiqurasiyadan sonra Gmail SMTP ilə göndərilir. WhatsApp və push provayder qoşulanadək növbədə qalır. SMS istifadə edilmir.",
-              )}
-            </p>
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>{t("Event", "Событие", "Hadisə")}</th>
-                    <th>{t("Channel", "Канал", "Kanal")}</th>
-                    <th>{t("State", "Состояние", "Vəziyyət")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {outbox.map((n) => (
-                    <tr key={n.id}>
-                      <td>
-                        {n.event}
-                        <small>{n.booking_id}</small>
-                      </td>
-                      <td>{n.channel}</td>
-                      <td>
-                        {n.status === "WAITING_CONFIGURATION"
-                          ? t(
-                              "Provider not connected",
-                              "Провайдер не подключён",
-                              "Provayder qoşulmayıb",
-                            )
-                          : n.status}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
+        {["Staff", "Partners", "Notifications"].includes(view) && (
+          <OfficeManagement
+            key={view}
+            module={view as "Staff" | "Partners" | "Notifications"}
+            auth={auth}
+            locale={locale}
+            onDirtyChange={setOfferDirty}
+          />
+        )}
+        {view === "Finance" && (
+          <RefundWorkspace
+            auth={auth}
+            locale={locale}
+            onDirtyChange={setOfferDirty}
+          />
         )}
         {view === "Tours" && (
           <div className="table-scroll">

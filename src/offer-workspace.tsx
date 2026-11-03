@@ -1,3 +1,5 @@
+import PartnerPicker from "./partner-picker";
+import { FinanceWorkspace } from "./finance-workspace";
 import RequestWorkspace from "./request-workspace";
 import PaymentWorkspace from "./payment-workspace";
 import ContractWorkspace from "./contract-workspace";
@@ -135,7 +137,9 @@ export default function OfferWorkspace({
       return item.title;
     }
   }
-  const [paymentDirty,setPaymentDirty] = useState(false);
+  const [receivedMinor, setReceivedMinor] = useState(0);
+  const [financeDirty, setFinanceDirty] = useState(false);
+  const [paymentDirty, setPaymentDirty] = useState(false);
   const [reject, setReject] = useState(false);
   const [freshBooking, setFreshBooking] = useState<Booking | null>(null);
   const [selected, setSelected] = useState<string | null>(null),
@@ -162,7 +166,8 @@ export default function OfferWorkspace({
   const modalRef = useRef<HTMLDialogElement>(null),
     focusRef = useRef<HTMLElement | null>(null);
   const b = freshBooking || bookings.find((x) => x.id === selected);
-  const canEdit = b?.status === "PENDING_REVIEW" && b.paid === 0;
+  const canEdit =
+    b?.status === "PENDING_REVIEW" && b.paid === 0 && receivedMinor === 0;
   const count = draft?.services.length || 0,
     total = draft?.services.reduce((s, line) => s + lineAmount(line), 0) || 0,
     checked =
@@ -235,9 +240,10 @@ export default function OfferWorkspace({
     setDirty(false);
     setPreviewVersion(0);
     setSentVersion(0);
+    setReceivedMinor(0);
     setAudit([]);
     try {
-      const [state, c, booking] = await Promise.all([
+      const [state, c, booking, payments] = await Promise.all([
         api<{
           draft: OfferDraft;
           previewVersion: number;
@@ -248,8 +254,13 @@ export default function OfferWorkspace({
           auth,
         ),
         api<Booking>("/api/v1/operations/bookings/" + id, auth),
+        api<{ receivedMinor?: number; paidMinor: number }>(
+          "/api/v1/operations/bookings/" + id + "/payment-context",
+          auth,
+        ),
       ]);
       setFreshBooking(booking);
+      setReceivedMinor(payments.receivedMinor ?? payments.paidMinor);
       setDraft(state?.draft || initial(booking));
       setCustomer(c);
       setPreviewVersion(state?.previewVersion || 0);
@@ -260,7 +271,10 @@ export default function OfferWorkspace({
       setLoading(false);
     }
   }
-  useEffect(() => onDirtyChange(dirty || paymentDirty), [dirty, paymentDirty, onDirtyChange]);
+  useEffect(
+    () => onDirtyChange(dirty || paymentDirty || financeDirty),
+    [dirty, paymentDirty, financeDirty, onDirtyChange],
+  );
   useEffect(() => {
     if (selected) void load(selected);
   }, [selected]);
@@ -386,7 +400,7 @@ export default function OfferWorkspace({
   }
   function back() {
     if (
-      dirty &&
+      (dirty || paymentDirty || financeDirty) &&
       !window.confirm(
         t(
           "Discard unsaved edits?",
@@ -402,7 +416,18 @@ export default function OfferWorkspace({
     setError("");
     setNotice("");
   }
-  if (!selected) return <RequestWorkspace auth={auth} refreshKey={bookings} locale={l} onOpen={id=>{setMode("review");setSelected(id);}}/>;
+  if (!selected)
+    return (
+      <RequestWorkspace
+        auth={auth}
+        refreshKey={bookings}
+        locale={l}
+        onOpen={(id) => {
+          setMode("review");
+          setSelected(id);
+        }}
+      />
+    );
   return (
     <div className="ow">
       <button className="ow-link" disabled={busy} onClick={back}>
@@ -614,8 +639,31 @@ export default function OfferWorkspace({
               {t("Activity", "История", "Tarixçə")}
             </button>
           </div>
-          {sentVersion > 0 && <ContractWorkspace key={b.id} bookingId={b.id} auth={auth} locale={l} />}
-          {sentVersion > 0 && <PaymentWorkspace key={b.id} bookingId={b.id} auth={auth} locale={l} onDirtyChange={setPaymentDirty} />}
+          {sentVersion > 0 && (
+            <ContractWorkspace
+              key={b.id}
+              bookingId={b.id}
+              auth={auth}
+              locale={l}
+            />
+          )}
+          {sentVersion > 0 && (
+            <>
+              <FinanceWorkspace
+                bookingId={b.id}
+                auth={auth}
+                locale={l}
+                onDirtyChange={setFinanceDirty}
+              />
+              <PaymentWorkspace
+                key={b.id}
+                bookingId={b.id}
+                auth={auth}
+                locale={l}
+                onDirtyChange={setPaymentDirty}
+              />
+            </>
+          )}
           {audit.length > 0 && (
             <details open className="ow-audit">
               <summary>
@@ -1012,7 +1060,7 @@ export default function OfferWorkspace({
                 </div>
                 <div className="ow-summary-line">
                   <span>{t("Paid", "Оплачено", "Ödənilib")}</span>
-                  <strong>{fmt(b.paid)}</strong>
+                  <strong>{fmt(receivedMinor / 100)}</strong>
                 </div>
               </div>
               <div>
@@ -1259,6 +1307,24 @@ export default function OfferWorkspace({
               <p>
                 {editor.name} · {b?.departure}
               </p>
+              <PartnerPicker
+                auth={auth}
+                locale={l}
+                serviceKey={editor.key}
+                currency={draft.currency}
+                date={b?.departure || ""}
+                onSelect={(service) =>
+                  setEditor({
+                    ...editor,
+                    name: service.name,
+                    supplier: service.partner_name,
+                    location: service.location.slice(0, 100),
+                    unitPrice: service.price_minor / 100,
+                    policy: service.policy,
+                    availability: "NOT_CHECKED",
+                  })
+                }
+              />
               <div className="ow-editor-grid">
                 <div>
                   <h3>
