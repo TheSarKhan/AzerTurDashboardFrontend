@@ -1,6 +1,7 @@
 import OfficeManagement from "./office-management";
 import { RefundWorkspace } from "./finance-workspace";
 import { Handshake, Users, Wallet } from "lucide-react";
+import AmendmentWorkspace from "./amendment-workspace";
 import CancellationWorkspace from "./cancellation-workspace";
 import React, { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
@@ -128,6 +129,9 @@ function QuoteDetails({
 function App() {
   const [roles, setRoles] = useState<string[]>([]);
   const [offerDirty, setOfferDirty] = useState(false);
+  const [amendmentRequestId, setAmendmentRequestId] = useState<string | null>(
+    null,
+  );
   const [cancelRequestId, setCancelRequestId] = useState<string | null>(null);
   const [data, setData] = useState<Overview | null>(null),
     [catalog, setCatalog] = useState<Tour[]>([]),
@@ -173,6 +177,11 @@ function App() {
   };
   function problem(e: unknown) {
     const specific: Record<string, [string, string, string]> = {
+      AMENDMENT_WORKFLOW_REQUIRED: [
+        "Open the contract amendment workspace; customer PDF approval is required.",
+        "Откройте изменение договора: требуется согласие клиента с PDF.",
+        "Müqavilə dəyişikliyi iş sahəsini açın; müştərinin PDF təsdiqi tələb olunur.",
+      ],
       MANUAL_REFUND_REQUIRED: [
         "The revised total is below the amount already paid. A manual refund must be handled first.",
         "Новая сумма меньше уже оплаченной. Сначала нужно обработать ручной возврат.",
@@ -517,6 +526,19 @@ function App() {
           />
         )}
         {view === "Requests" &&
+          amendmentRequestId &&
+          inbox.find((r) => r.id === amendmentRequestId) && (
+            <AmendmentWorkspace
+              key={amendmentRequestId}
+              request={inbox.find((r) => r.id === amendmentRequestId)!}
+              auth={auth}
+              locale={locale}
+              onBack={() => setAmendmentRequestId(null)}
+              onDone={() => void load(auth)}
+              onDirtyChange={setOfferDirty}
+            />
+          )}
+        {view === "Requests" &&
           cancelRequestId &&
           inbox.find((r) => r.id === cancelRequestId) && (
             <CancellationWorkspace
@@ -530,6 +552,7 @@ function App() {
             />
           )}
         {view === "Requests" &&
+          !amendmentRequestId &&
           !(cancelRequestId && inbox.find((r) => r.id === cancelRequestId)) && (
             <>
               <p>
@@ -562,14 +585,23 @@ function App() {
                       )}
                     </button>
                   )}
+                  {r.kind === "CHANGE" && (
+                    <button onClick={() => setAmendmentRequestId(r.id)}>
+                      {t(
+                        "Review contract amendment",
+                        "Проверить изменение договора",
+                        "Müqavilə dəyişikliyini hazırla",
+                      )}
+                    </button>
+                  )}
                   {r.response && <p>{r.response}</p>}
                   {r.status === "PENDING" && r.kind === "CHANGE" && (
                     <details>
                       <summary>
                         {t(
-                          "Prepare revised dates and pricing",
-                          "Обновить даты и стоимость",
-                          "Yeni tarix və qiyməti hazırla",
+                          "Before contract: revise dates and pricing",
+                          "До договора: обновить даты и стоимость",
+                          "Müqavilədən əvvəl: tarix və qiyməti yenilə",
                         )}
                       </summary>
                       <form
@@ -739,7 +771,15 @@ function App() {
                       <div className="decision-actions">
                         <button
                           value="accept"
-                          disabled={busy || r.kind === "CANCEL"}
+                          disabled={
+                            busy ||
+                            r.kind === "CANCEL" ||
+                            reservations.some(
+                              (b) =>
+                                b.id === r.bookingId &&
+                                (b.paid > 0 || b.status === "CONFIRMED"),
+                            )
+                          }
                         >
                           {t("Accept request", "Принять", "Sorğunu qəbul et")}
                         </button>

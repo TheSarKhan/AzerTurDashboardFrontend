@@ -352,6 +352,7 @@ export function FinanceWorkspace({
 
 type Refund = {
   request_id: string;
+  kind?: string;
   booking_id: string;
   payload: string;
   version: number | null;
@@ -453,9 +454,9 @@ export function RefundWorkspace({
           </h2>
           <p>
             {t(
-              "Approved cancellation amounts and the status of returning funds.",
+              "Approved cancellation and change refunds, with transfer tracking.",
               "Одобренные суммы и состояние возврата средств.",
-              "Təsdiqlənmiş ləğv məbləğləri və pulun qaytarılma vəziyyəti.",
+              "Təsdiqlənmiş ləğv və dəyişiklik geri ödənişləri, köçürmələrin izlənməsi.",
             )}
           </p>
         </div>
@@ -480,6 +481,15 @@ export function RefundWorkspace({
         return (
           <article className="om-refund" key={r.request_id}>
             <h3>#{r.booking_id.slice(0, 8)}</h3>
+            <p>
+              {r.kind === "CHANGE"
+                ? t(
+                    "Booking change",
+                    "Изменение поездки",
+                    "Sifariş dəyişikliyi",
+                  )
+                : t("Cancellation", "Отмена", "Ləğv")}
+            </p>
             <p className="om-number">
               {new Intl.NumberFormat(l, {
                 style: "currency",

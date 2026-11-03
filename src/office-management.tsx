@@ -104,6 +104,26 @@ export default function OfficeManagement({
     activity: kindNames.ACTIVITY,
   };
   const eventNames: Record<string, string> = {
+    AMENDMENT_SENT: t(
+      "A change proposal is ready",
+      "Предложение изменения готово",
+      "Dəyişiklik təklifi hazırdır",
+    ),
+    AMENDMENT_ACCEPTED: t(
+      "Changes accepted",
+      "Изменения приняты",
+      "Dəyişikliklər təsdiqlənib",
+    ),
+    AMENDMENT_DECLINED: t(
+      "Proposal declined",
+      "Предложение отклонено",
+      "Təklif rədd edilib",
+    ),
+    AMENDMENT_REFUND_UPDATED: t(
+      "Refund tracking updated",
+      "Статус возврата обновлён",
+      "Geri ödəniş vəziyyəti yenilənib",
+    ),
     OFFER_SENT: t("Offer sent", "Предложение отправлено", "Təklif göndərilib"),
     CONTRACT_SENT: t(
       "Contract sent",
