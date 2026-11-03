@@ -31,7 +31,13 @@ type Activity = {
   action: string;
   created_at: string;
 };
-type Data = { actor: string; rows: Row[]; activity: Activity[] };
+type Data = {
+  actor: string;
+  admin: boolean;
+  staff: { username: string; name: string }[];
+  rows: Row[];
+  activity: Activity[];
+};
 export default function RequestWorkspace({
   auth,
   locale,
@@ -120,12 +126,13 @@ export default function RequestWorkspace({
     void load();
   }, [auth, refreshKey]);
   useEffect(() => setPage(1), [search, status, owner, date]);
-  async function assign(r: Row) {
+  async function assign(r: Row, assignee?: string) {
     setBusy(true);
     setError("");
     try {
       await api("/api/v1/operations/bookings/" + r.id + "/assignment", auth, {
-        assign: !r.assigned_to,
+        assign: assignee !== undefined ? !!assignee : !r.assigned_to,
+        assignee: assignee || null,
         expectedOwner: r.assigned_to,
       });
       await load();
@@ -235,7 +242,7 @@ export default function RequestWorkspace({
   ];
   const actionLabels: Record<string, string> = {
     REQUESTED: t("created a request", "создал заявку", "sorğu yaradıb"),
-    ASSIGNED: t("took ownership", "взял заявку", "sorğunu götürüb"),
+    ASSIGNED: t("assigned the request", "назначил заявку", "sorğunu götürüb"),
     UNASSIGNED: t("released assignment", "снял назначение", "təyinatı buraxıb"),
     OFFER_SENT: t("sent an offer", "отправил предложение", "təklif göndərib"),
     CONTRACT_ACCEPTED: t(
@@ -407,31 +414,70 @@ export default function RequestWorkspace({
                       </span>
                     </td>
                     <td>
-                      <button
-                        className="rq-owner"
-                        disabled={
-                          busy ||
-                          (!!r.assigned_to && r.assigned_to !== data?.actor)
-                        }
-                        onClick={() => void assign(r)}
-                        title={
-                          r.assigned_to
-                            ? t(
-                                "Release assignment",
-                                "Снять назначение",
-                                "Təyinatı burax",
-                              )
-                            : t(
-                                "Assign to me",
-                                "Назначить мне",
-                                "Özümə təyin et",
-                              )
-                        }
-                      >
-                        <UserRound size={15} />
-                        {r.assigned_to ||
-                          t("Assign to me", "Назначить мне", "Özümə götür")}
-                      </button>
+                      {data?.admin ? (
+                        <select
+                          className="rq-assignee"
+                          aria-label={
+                            t(
+                              "Assigned to",
+                              "\u0418\u0441\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u044c",
+                              "Məsul",
+                            ) +
+                            " " +
+                            r.id.slice(0, 8)
+                          }
+                          value={r.assigned_to || ""}
+                          disabled={busy}
+                          onChange={(e) => void assign(r, e.target.value)}
+                        >
+                          <option value="">
+                            {t(
+                              "Unassigned",
+                              "\u041d\u0435 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d\u043e",
+                              "Təyin edilməyib",
+                            )}
+                          </option>
+                          {r.assigned_to &&
+                            !data.staff.some(
+                              (x) => x.username === r.assigned_to,
+                            ) && (
+                              <option value={r.assigned_to}>
+                                {r.assigned_to}
+                              </option>
+                            )}
+                          {data.staff.map((x) => (
+                            <option key={x.username} value={x.username}>
+                              {x.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <button
+                          className="rq-owner"
+                          disabled={
+                            busy ||
+                            (!!r.assigned_to && r.assigned_to !== data?.actor)
+                          }
+                          onClick={() => void assign(r)}
+                          title={
+                            r.assigned_to
+                              ? t(
+                                  "Release assignment",
+                                  "Снять назначение",
+                                  "Təyinatı burax",
+                                )
+                              : t(
+                                  "Assign to me",
+                                  "Назначить мне",
+                                  "Özümə təyin et",
+                                )
+                          }
+                        >
+                          <UserRound size={15} />
+                          {r.assigned_to ||
+                            t("Assign to me", "Назначить мне", "Özümə götür")}
+                        </button>
+                      )}
                     </td>
                     <td>
                       <button className="rq-next" onClick={() => onOpen(r.id)}>

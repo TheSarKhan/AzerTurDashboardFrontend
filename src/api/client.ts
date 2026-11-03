@@ -103,4 +103,4 @@ export const bookings = (auth: string) =>
 export const requests = (auth: string) =>
   api<BookingRequest[]>("/api/v1/operations/requests", auth);
 export const notifications = (auth: string) =>
-  api<Notification[]>("/api/v1/operations/notifications", auth);
+  api<{items:Notification[]}>("/api/v1/operations/notifications", auth).then(x=>x.items);

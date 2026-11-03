@@ -19,6 +19,7 @@ type Line = {
 };
 type Service = { key: string; name: string; total: number; policy: string };
 type Context = {
+  savedAllocation?: { serviceKey: string; amountMinor: number }[];
   customer?: { name: string; email: string; locale: string };
   contractVersion: number;
   contractId: string | null;
@@ -187,7 +188,9 @@ export default function CancellationWorkspace({
             policyText: s.policy,
             supplierReference: "",
             basis: "",
-            allocatedPaidMinor: 0,
+            allocatedPaidMinor:
+              c.savedAllocation?.find((x) => x.serviceKey === s.key)
+                ?.amountMinor || 0,
             tiers: [],
             verified: false,
           })),
