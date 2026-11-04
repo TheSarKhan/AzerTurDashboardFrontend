@@ -418,3 +418,5 @@ td small {
   border-top: 1px solid #d8ddd5;
   padding-top: 12px;
 }
+
+.td-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin:20px 0}.td-grid label{display:grid;gap:8px}.td-grid input,.td-grid select{width:100%;min-height:42px;padding:10px;border:1px solid #d6ddd7;background:#fff}.td-list{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0}.ow-contract textarea{display:block;width:100%;min-height:90px;margin:12px 0;padding:12px}
