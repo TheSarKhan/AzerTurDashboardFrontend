@@ -1,3 +1,4 @@
+import OriginalPdfPreview from "./original-pdf-preview";
 import { useEffect, useState } from "react";
 import { api, type Locale } from "./api/client";
 
@@ -7,6 +8,7 @@ export default function ContractWorkspace({ bookingId, auth, locale }: { booking
   const t = (en: string, ru: string, az: string) => locale === "az" ? az : locale === "ru" ? ru : en;
   const [contract, setContract] = useState<Contract | null>(null);
   const [pdf, setPdf] = useState("");
+  const [pdfReady,setPdfReady]=useState(false);
   const [offerId, setOfferId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -18,6 +20,7 @@ export default function ContractWorkspace({ bookingId, auth, locale }: { booking
   }
   useEffect(() => { setContract(null); setError(""); void load(); }, [bookingId]);
   useEffect(() => {
+    setPdfReady(false);
     if (!contract) { setPdf(""); return; }
     const abort = new AbortController();
     let url = "";
@@ -52,9 +55,9 @@ export default function ContractWorkspace({ bookingId, auth, locale }: { booking
     <label className="ow-outline">{t("Choose PDF", "Выбрать PDF", "PDF seç")} <input type="file" accept="application/pdf,.pdf" disabled={busy || !offerId} onChange={e => { const f=e.target.files?.[0]; if(f) void upload(f); e.currentTarget.value=""; }} /></label>
     {error && <p className="ow-error" role="alert">{error}</p>}
     {contract && <div><p><strong>{contract.filename}</strong> · v{contract.version} · {contract.state} · {t("Offer", "Предложение", "Təklif")} v{contract.offer_revision}</p>
-      {pdf && <iframe title={t("Contract PDF preview","Просмотр PDF","Müqaviləyə baxış")} src={pdf} style={{width:"100%",height:520,border:"1px solid #ddd"}} />}
+      {pdf && <OriginalPdfPreview key={pdf} url={pdf} locale={locale} onReady={()=>setPdfReady(true)} onError={()=>setPdfReady(false)}/>}
       {!contract.current_offer && <p className="ow-error">{t("The offer changed. Upload a new contract for the latest offer.", "Предложение изменилось. Загрузите новый договор.", "Təklif dəyişib. Son təklifə uyğun yeni müqavilə yükləyin.")}</p>}
-      {contract.state === "DRAFT" && <p><button className="ow-primary" disabled={busy || !pdf || !contract.current_offer} onClick={() => void send()}>{t("Send contract","Отправить договор","Müqaviləni göndər")}</button></p>}
+      {contract.state === "DRAFT" && <p><button className="ow-primary" disabled={busy || !pdf || !pdfReady || !contract.current_offer} onClick={() => void send()}>{t("Send contract","Отправить договор","Müqaviləni göndər")}</button></p>}
       {contract.current_offer && contract.state === "SENT" && <p>{t("Waiting for customer confirmation.","Ожидает подтверждения клиента.","Müştərinin təsdiqi gözlənilir.")}</p>}
       {contract.current_offer && contract.state === "ACCEPTED" && <p>{t("Confirmed by customer.","Подтверждено клиентом.","Müştəri təsdiqləyib.")}</p>}
     </div>}

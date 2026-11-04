@@ -1,3 +1,4 @@
+import OriginalPdfPreview from "./original-pdf-preview";
 import { useEffect, useState } from "react";
 import { api, type Locale, type BookingRequest } from "./api/client";
 import { FinanceWorkspace } from "./finance-workspace";
@@ -1080,11 +1081,7 @@ export default function AmendmentWorkspace({
                               "Yeni vərəqdə aç",
                             )}
                           </a>
-                          <iframe
-                            className="amendment-pdf"
-                            src={pdf}
-                            title="Amendment contract PDF"
-                          />
+                          <OriginalPdfPreview key={pdf} url={pdf} locale={l}/>
                           <label className="amendment-check">
                             <input
                               type="checkbox"
@@ -1242,11 +1239,7 @@ export default function AmendmentWorkspace({
               </p>
             )}
             {pdf && (!pending || !draftPdf) && (
-              <iframe
-                className="amendment-pdf"
-                src={pdf}
-                title="Archived contract PDF"
-              />
+              <OriginalPdfPreview key={pdf} url={pdf} locale={l}/>
             )}
           </section>
         </>

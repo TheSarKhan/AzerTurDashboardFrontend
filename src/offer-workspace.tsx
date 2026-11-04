@@ -1,3 +1,4 @@
+import TravelDocuments from './travel-documents';
 import PartnerPicker from "./partner-picker";
 import { FinanceWorkspace } from "./finance-workspace";
 import RequestWorkspace from "./request-workspace";
@@ -639,6 +640,7 @@ export default function OfferWorkspace({
               {t("Activity", "История", "Tarixçə")}
             </button>
           </div>
+          <TravelDocuments key={"documents-"+b.id} bookingId={b.id} auth={auth} locale={l}/>
           {sentVersion > 0 && (
             <ContractWorkspace
               key={b.id}
