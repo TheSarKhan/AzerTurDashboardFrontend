@@ -11,6 +11,7 @@ import {
   Inbox,
   Bell,
   Users,
+  CalendarDays,
 } from "lucide-react";
 import {
   api,
@@ -32,6 +33,7 @@ import {
   type Audit,
   type Locale,
 } from "./api/client";
+import { EventsWorkspace } from "./events-workspace";
 import "./styles.css";
 
 function QuoteDetails({
@@ -164,6 +166,7 @@ function App() {
     Bookings: t("Bookings", "Бронирования", "Rezervasiyalar"),
     Requests: t("Customer requests", "Запросы клиентов", "Müştəri sorğuları"),
     Notifications: t("Notifications", "Уведомления", "Bildirişlər"),
+    Events: t("Events", "События", "Tədbirlər"),
     Staff: t("Staff", "Сотрудники", "İşçilər"),
   };
   const statuses: Record<string, string> = {
@@ -470,6 +473,7 @@ function App() {
             [Map, "Tours"],
             [FileText, "Quotes"],
             [Bell, "Notifications"],
+            [CalendarDays, "Events"],
             ...(staff?.role === "ADMIN" ? [[Users, "Staff"]] : []),
           ].map(([Icon, title]) => {
             const I = Icon as typeof Map;
@@ -1030,6 +1034,15 @@ function App() {
               </table>
             </div>
           </>
+        )}
+        {view === "Events" && (
+          <EventsWorkspace
+            auth={auth}
+            isAdmin={staff?.role === "ADMIN"}
+            t={t}
+            locale={locale}
+            onError={setError}
+          />
         )}
         {view === "Staff" && staff?.role === "ADMIN" && (
           <>
