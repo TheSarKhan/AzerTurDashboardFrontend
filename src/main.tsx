@@ -17,6 +17,7 @@ import {
   Bell,
   Users,
   CalendarDays,
+  MessageSquare,
 } from "lucide-react";
 import {
   api,
@@ -39,6 +40,7 @@ import {
   type Locale,
 } from "./api/client";
 import { EventsWorkspace } from "./events-workspace";
+import { MessagesWorkspace } from "./messages-workspace";
 import "./styles.css";
 import OfferWorkspace from "./offer-workspace";
 
@@ -181,6 +183,7 @@ function App() {
     Requests: t("Customer requests", "Запросы клиентов", "Müştəri sorğuları"),
     Notifications: t("Notifications", "Уведомления", "Bildirişlər"),
     Events: t("Events", "События", "Tədbirlər"),
+    Messages: t("Messages", "Сообщения", "Mesajlar"),
     Staff: t("Staff", "Сотрудники", "İşçilər"),
   };
   const statuses: Record<string, string> = {
@@ -461,9 +464,9 @@ function App() {
         </form>
         <small>
           {t(
-            "Demo payment mode. The session is kept only in memory.",
-            "Демо-оплата. Сессия хранится только в памяти.",
-            "Demo ödəniş rejimi. Sessiya yalnız yaddaşda saxlanılır.",
+            "The session is kept only in memory.",
+            "Сессия хранится только в памяти.",
+            "Sessiya yalnız yaddaşda saxlanılır.",
           )}
         </small>
       </main>
@@ -502,6 +505,7 @@ function App() {
             [FileText, "Quotes"],
             [Bell, "Notifications"],
             [CalendarDays, "Events"],
+            [MessageSquare, "Messages"],
             [Handshake, "Partners"],
             [Wallet, "Finance"],
             ...(staff?.role === "ADMIN" ? [[Users, "Staff"]] : []),
@@ -947,6 +951,9 @@ function App() {
             locale={locale}
             onDirtyChange={setOfferDirty}
           />
+        )}
+        {view === "Messages" && (
+          <MessagesWorkspace auth={auth} locale={locale} onError={setError} />
         )}
         {view === "Events" && (
           <EventsWorkspace

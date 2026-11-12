@@ -26,7 +26,6 @@ export interface Overview {
   tourCount: number;
   quoteCount: number;
   recentQuotes: QuoteSummary[];
-  mode: string;
 }
 export interface Booking {
   id: string;

@@ -10,6 +10,9 @@ type Request = {
   currency: string;
   status: string;
   customer_message: string;
+  paid_at?: string | null;
+  payment_method?: string | null;
+  payment_reference?: string | null;
 };
 type Offer = {
   id: string;
@@ -64,7 +67,9 @@ export default function PaymentWorkspace({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
-    [sent, setSent] = useState(false);
+    [sent, setSent] = useState(false),
+    [receipt, setReceipt] = useState<string | null>(null),
+    [canRecord, setCanRecord] = useState(false);
   const base = "/api/v1/operations/bookings/" + bookingId,
     fmt = (n: number) =>
       new Intl.NumberFormat(l === "az" ? "az-AZ" : l, {
@@ -101,6 +106,57 @@ export default function PaymentWorkspace({
           "Не удалось загрузить оплату.",
           "Ödəniş məlumatları yüklənmədi.",
         ),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  useEffect(() => {
+    api<{ roles: string[] }>("/api/v1/operations/me", auth)
+      .then((me) => setCanRecord(me.roles.includes("ROLE_FINANCE")))
+      .catch(() => setCanRecord(false));
+  }, [auth]);
+  async function record(r: Request, f: FormData) {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const received = String(f.get("receivedAt") || "");
+      await api(base + "/payment-requests/" + r.id + "/mark-paid", auth, {
+        amount: Number(String(f.get("amount")).replace(",", ".")),
+        method: String(f.get("method")),
+        reference: String(f.get("reference") || "") || null,
+        receivedAt: received ? new Date(received).toISOString() : null,
+      });
+      setReceipt(null);
+      setNotice(
+        t(
+          "Payment recorded. The customer was notified.",
+          "Платёж записан. Клиент уведомлён.",
+          "Ödəniş qeydə alındı. Müştəriyə bildiriş göndərildi.",
+        ),
+      );
+      await load();
+    } catch (e) {
+      const code = e instanceof Error ? e.message : "";
+      setError(
+        code === "AMOUNT_MISMATCH"
+          ? t(
+              "The amount does not match this payment request.",
+              "Сумма не совпадает с запросом оплаты.",
+              "Məbləğ ödəniş tələbi ilə üst-üstə düşmür.",
+            )
+          : code === "PAYMENT_ALREADY_RECORDED"
+            ? t(
+                "This payment was already recorded.",
+                "Этот платёж уже записан.",
+                "Bu ödəniş artıq qeydə alınıb.",
+              )
+            : t(
+                "Could not record the payment. Check the details and try again.",
+                "Не удалось записать платёж. Проверьте данные.",
+                "Ödəniş qeydə alınmadı. Məlumatları yoxlayın.",
+              ),
       );
     } finally {
       setBusy(false);
@@ -453,8 +509,79 @@ export default function PaymentWorkspace({
                           "Köhnə müqavilə",
                         )
                       : r.status}
+                    {r.status === "PAID" && r.paid_at && (
+                      <small>
+                        {" "}
+                        · {new Date(r.paid_at).toLocaleDateString(l)} ·{" "}
+                        {r.payment_method}
+                        {r.payment_reference ? " · " + r.payment_reference : ""}
+                      </small>
+                    )}
                   </span>
                   <strong>{fmt(r.amount_minor)}</strong>
+                  {canRecord && r.status === "OPEN" && (
+                    <button
+                      type="button"
+                      onClick={() => setReceipt(receipt === r.id ? null : r.id)}
+                    >
+                      {t("Mark as paid", "Отметить оплаченным", "Ödənilib qeyd et")}
+                    </button>
+                  )}
+                  {receipt === r.id && (
+                    <form
+                      className="payment-record"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void record(r, new FormData(e.currentTarget));
+                      }}
+                    >
+                      <p>
+                        {t(
+                          "Record money you have received. Type the exact amount to confirm.",
+                          "Запишите полученные деньги. Введите точную сумму для подтверждения.",
+                          "Aldığınız ödənişi qeyd edin. Təsdiq üçün dəqiq məbləği yazın.",
+                        )}
+                      </p>
+                      <label>
+                        {t("Amount received", "Получено", "Alınan məbləğ")}
+                        <input
+                          name="amount"
+                          inputMode="decimal"
+                          required
+                          autoComplete="off"
+                          placeholder={String(r.amount_minor / 100)}
+                        />
+                      </label>
+                      <label>
+                        {t("Method", "Способ", "Üsul")}
+                        <select name="method" defaultValue="BANK_TRANSFER">
+                          <option value="BANK_TRANSFER">
+                            {t("Bank transfer", "Банковский перевод", "Bank köçürməsi")}
+                          </option>
+                          <option value="CASH">{t("Cash", "Наличные", "Nağd")}</option>
+                          <option value="CARD_TERMINAL">
+                            {t("Card terminal", "Терминал", "Kart terminalı")}
+                          </option>
+                          <option value="OTHER">{t("Other", "Другое", "Digər")}</option>
+                        </select>
+                      </label>
+                      <label>
+                        {t("Reference", "Референс", "İstinad nömrəsi")}
+                        <input name="reference" maxLength={120} autoComplete="off" />
+                      </label>
+                      <label>
+                        {t("Received on", "Дата получения", "Alınma tarixi")}
+                        <input
+                          name="receivedAt"
+                          type="datetime-local"
+                          max={new Date().toISOString().slice(0, 16)}
+                        />
+                      </label>
+                      <button disabled={busy}>
+                        {t("Record payment", "Записать платёж", "Ödənişi qeyd et")}
+                      </button>
+                    </form>
+                  )}
                 </div>
               ))
             ) : (

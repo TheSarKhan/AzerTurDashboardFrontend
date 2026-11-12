@@ -84,3 +84,19 @@
     padding: 16px;
   }
 }
+.payment-row { flex-wrap: wrap; }
+.payment-row small { color: #626a63; }
+.payment-record {
+  flex: 1 1 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid #d8ddd5;
+  border-radius: 8px;
+  background: #fff;
+}
+.payment-record > p { grid-column: 1 / -1; margin: 0; }
+.payment-record label { display: grid; gap: 6px; font-size: 12px; }
