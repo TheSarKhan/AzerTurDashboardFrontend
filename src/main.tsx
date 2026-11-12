@@ -414,7 +414,7 @@ function App() {
       <main className="login">
         <div className="login-brand">
           <p className="brand">
-            azertur <span>operations</span>
+            AzTrip <span>operations</span>
           </p>
           {language}
         </div>
@@ -481,7 +481,7 @@ function App() {
           <span className="ow-brand-mark" aria-hidden="true">
             A
           </span>{" "}
-          azərtur
+          AzTrip
         </p>
         <p className="workspace">
           {t("Office operations", "Операции офиса", "Ofis əməliyyatları")}
@@ -565,7 +565,7 @@ function App() {
         <header>
           <div>
             <p>
-              AZERTUR /{" "}
+              AZTRIP /{" "}
               {staff?.role === "ADMIN" && adminHost ? "ADMIN" : "OPERATIONS"}
             </p>
             <h1>{names[view]}</h1>

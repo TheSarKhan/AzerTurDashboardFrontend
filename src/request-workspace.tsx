@@ -615,7 +615,7 @@ export default function RequestWorkspace({
           </section>
         </div>
       </div>
-      <footer>© {new Date().getFullYear()} azərtur.</footer>
+      <footer>© {new Date().getFullYear()} AzTrip.</footer>
     </section>
   );
 }
