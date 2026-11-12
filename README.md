@@ -21,7 +21,7 @@ The Dockerfile serves the built static app using unprivileged Nginx. Set `VITE_A
 
 ## Customer review workflow update
 
-The customer registration, durable reservation request, office approval and demo-payment flows are now implemented. See [the current architecture, API and remaining production work](docs/ARCHITECTURE.md); that document supersedes the initial foundation-only notes above. No cloud deployment or live payment/provider connection is included.
+The customer registration, durable reservation request, offer and contract workflow and finance-recorded payments are now implemented. See [the current architecture, API and remaining production work](docs/ARCHITECTURE.md); that document supersedes the initial foundation-only notes above. No cloud deployment or live payment/provider connection is included.
 
 ## Office workflows
 
