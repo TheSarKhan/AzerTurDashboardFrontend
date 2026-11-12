@@ -135,6 +135,11 @@ export default function OfficeManagement({
       "Запрошена оплата",
       "Ödəniş tələb edilib",
     ),
+    PAYMENT_RECEIVED: t(
+      "Payment received",
+      "Платёж получен",
+      "Ödəniş qəbul edildi",
+    ),
     REFUND_UPDATED: t(
       "Refund update",
       "Обновление возврата",
