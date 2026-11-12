@@ -1,0 +1,107 @@
+.amendment-workspace {
+  max-width: 1440px;
+}
+.amendment-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr 0.7fr;
+  gap: 28px;
+  padding: 28px;
+  background: #edf0e9;
+  border: 1px solid #e0e4dc;
+  border-radius: 6px;
+  margin: 24px 0;
+}
+.amendment-block {
+  padding: 28px;
+  margin: 24px 0;
+  background: #fff;
+  border: 1px solid #dce1df;
+  border-radius: 6px;
+}
+.amendment-block h3 {
+  margin-top: 0;
+}
+.amendment-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.amendment-service {
+  border-top: 1px solid #dce1df;
+  margin-top: 26px;
+  padding: 24px 0;
+}
+.amendment-workspace label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+.amendment-workspace input,
+.amendment-workspace select,
+.amendment-workspace textarea {
+  padding: 11px;
+  border: 1px solid #ccd4d1;
+  border-radius: 4px;
+  background: #fff;
+  color: #10211d;
+  min-width: 0;
+  font: inherit;
+}
+.amendment-workspace textarea {
+  min-height: 85px;
+}
+.amendment-editor {
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.amendment-tier {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1.5fr auto;
+  gap: 12px;
+  align-items: center;
+}
+.amendment-workspace .amendment-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+.amendment-pdf {
+  display: block;
+  width: 100%;
+  height: 560px;
+  border: 1px solid #ccd4d1;
+  margin: 20px 0;
+}
+.amendment-finance {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  padding: 24px;
+  background: #eff2ec;
+  margin: 20px 0;
+}
+.amendment-finance div {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.amendment-finance strong {
+  font-size: 23px;
+  color: #075446;
+}
+@media (max-width: 850px) {
+  .amendment-summary,
+  .amendment-grid,
+  .amendment-finance {
+    grid-template-columns: 1fr;
+  }
+  .amendment-tier {
+    grid-template-columns: 1fr 1fr;
+  }
+  .amendment-block {
+    padding: 18px;
+  }
+}

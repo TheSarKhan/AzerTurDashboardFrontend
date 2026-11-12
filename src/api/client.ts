@@ -114,7 +114,7 @@ export const bookings = (auth: string) =>
 export const requests = (auth: string) =>
   api<BookingRequest[]>("/api/v1/operations/requests", auth);
 export const notifications = (auth: string) =>
-  api<Notification[]>("/api/v1/operations/notifications", auth);
+  api<{items:Notification[]}>("/api/v1/operations/notifications", auth).then(x=>x.items);
 export const staffLogin = (email: string, password: string) =>
   api<{ token: string; staff: Staff }>("/api/v1/staff/auth/login", undefined, {
     email,

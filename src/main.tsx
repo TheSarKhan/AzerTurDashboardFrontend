@@ -1,3 +1,8 @@
+import OfficeManagement from "./office-management";
+import { RefundWorkspace } from "./finance-workspace";
+import { Handshake, Wallet } from "lucide-react";
+import AmendmentWorkspace from "./amendment-workspace";
+import CancellationWorkspace from "./cancellation-workspace";
 import React, { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -35,6 +40,7 @@ import {
 } from "./api/client";
 import { EventsWorkspace } from "./events-workspace";
 import "./styles.css";
+import OfferWorkspace from "./offer-workspace";
 
 function QuoteDetails({
   booking,
@@ -129,6 +135,12 @@ function QuoteDetails({
 }
 
 function App() {
+  const [roles, setRoles] = useState<string[]>([]);
+  const [offerDirty, setOfferDirty] = useState(false);
+  const [amendmentRequestId, setAmendmentRequestId] = useState<string | null>(
+    null,
+  );
+  const [cancelRequestId, setCancelRequestId] = useState<string | null>(null);
   const [data, setData] = useState<Overview | null>(null),
     [catalog, setCatalog] = useState<Tour[]>([]),
     [reservations, setReservations] = useState<Booking[]>([]),
@@ -160,10 +172,12 @@ function App() {
       .catch((e) => setError(problem(e)));
   }, [view, auth, staff]);
   const names: Record<string, string> = {
+    Partners: t("Partners", "Партнёры", "Partnyorlar"),
+    Finance: t("Refunds", "Возвраты", "Geri ödənişlər"),
     Overview: t("Overview", "Обзор", "İcmal"),
     Tours: t("Tours", "Туры", "Turlar"),
     Quotes: t("Quotes", "Расчёты", "Qiymət sorğuları"),
-    Bookings: t("Bookings", "Бронирования", "Rezervasiyalar"),
+    Bookings: t("Requests", "Заявки", "Sorğular"),
     Requests: t("Customer requests", "Запросы клиентов", "Müştəri sorğuları"),
     Notifications: t("Notifications", "Уведомления", "Bildirişlər"),
     Events: t("Events", "События", "Tədbirlər"),
@@ -182,6 +196,11 @@ function App() {
   };
   function problem(e: unknown) {
     const specific: Record<string, [string, string, string]> = {
+      AMENDMENT_WORKFLOW_REQUIRED: [
+        "Open the contract amendment workspace; customer PDF approval is required.",
+        "Откройте изменение договора: требуется согласие клиента с PDF.",
+        "Müqavilə dəyişikliyi iş sahəsini açın; müştərinin PDF təsdiqi tələb olunur.",
+      ],
       MANUAL_REFUND_REQUIRED: [
         "The revised total is below the amount already paid. A manual refund must be handled first.",
         "Новая сумма меньше уже оплаченной. Сначала нужно обработать ручной возврат.",
@@ -287,6 +306,10 @@ function App() {
         requests(credentials),
         notifications(credentials),
       ]);
+      setRoles(
+        (await api<{ roles: string[] }>("/api/v1/operations/me", credentials))
+          .roles,
+      );
       setData(summary);
       setCatalog(list);
       setReservations(b);
@@ -451,7 +474,12 @@ function App() {
   return (
     <div className="shell">
       <aside>
-        <p className="brand">azertur</p>
+        <p className="brand">
+          <span className="ow-brand-mark" aria-hidden="true">
+            A
+          </span>{" "}
+          azərtur
+        </p>
         <p className="workspace">
           {t("Office operations", "Операции офиса", "Ofis əməliyyatları")}
         </p>
@@ -474,6 +502,8 @@ function App() {
             [FileText, "Quotes"],
             [Bell, "Notifications"],
             [CalendarDays, "Events"],
+            [Handshake, "Partners"],
+            [Wallet, "Finance"],
             ...(staff?.role === "ADMIN" ? [[Users, "Staff"]] : []),
           ].map(([Icon, title]) => {
             const I = Icon as typeof Map;
@@ -481,16 +511,48 @@ function App() {
               <button
                 key={title as string}
                 className={view === title ? "active" : ""}
-                onClick={() => setView(title as string)}
+                onClick={() => {
+                  if (title === view) return;
+                  if (
+                    offerDirty &&
+                    title !== view &&
+                    !window.confirm(
+                      t(
+                        "Discard unsaved changes?",
+                        "Отменить несохранённые изменения?",
+                        "Saxlanmamış təklif düzəlişləri silinsin?",
+                      ),
+                    )
+                  )
+                    return;
+                  setOfferDirty(false);
+                  setView(title as string);
+                }}
               >
                 <I size={18} />
                 {names[title as string]}
-                {title === "Bookings" && pending > 0 && <span>{pending}</span>}
               </button>
             );
           })}
         </nav>
-        <button className="logout" onClick={() => void signOut()}>
+        <button
+          className="logout"
+          onClick={() => {
+            if (
+              offerDirty &&
+              !window.confirm(
+                t(
+                  "Discard unsaved changes?",
+                  "Отменить несохранённые изменения?",
+                  "Saxlanmamış təklif düzəlişləri silinsin?",
+                ),
+              )
+            )
+              return;
+            setOfferDirty(false);
+            void signOut();
+          }}
+        >
           <LogOut size={18} />
           {t("Sign out", "Выйти", "Çıxış")}
         </button>
@@ -525,9 +587,9 @@ function App() {
         )}
         <p className="notice">
           {t(
-            "Review availability before approval. Customer payment opens only after your approval. All payments are demos.",
-            "Проверьте доступность до одобрения. Оплата клиента доступна только после вашего решения. Платежи демонстрационные.",
-            "Təsdiqdən əvvəl mövcudluğu yoxlayın. Müştərinin ödənişi yalnız təsdiqinizdən sonra açılır. Bütün ödənişlər demodur.",
+            "Review suppliers and service terms before sending an offer. Sending an offer does not open payment.",
+            "Проверьте поставщиков и условия услуг перед отправкой предложения. Отправка не открывает оплату.",
+            "Təklif göndərməzdən əvvəl təchizatçıları və xidmət şərtlərini yoxlayın. Təklif göndərmək ödəniş açmır.",
           )}
         </p>
         {view === "Overview" && (
@@ -576,464 +638,315 @@ function App() {
           </>
         )}
         {view === "Bookings" && (
-          <>
-            <div className="queue-filter">
-              <label>
-                {t("Status", "Статус", "Status")}
-                <select
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                >
-                  <option value="ALL">{t("All", "Все", "Hamısı")}</option>
-                  {Object.entries(statuses).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+          <OfferWorkspace
+            auth={auth}
+            locale={locale}
+            bookings={reservations}
+            requests={inbox}
+            catalog={catalog}
+            onDirtyChange={setOfferDirty}
+          />
+        )}
+        {view === "Requests" &&
+          amendmentRequestId &&
+          inbox.find((r) => r.id === amendmentRequestId) && (
+            <AmendmentWorkspace
+              key={amendmentRequestId}
+              request={inbox.find((r) => r.id === amendmentRequestId)!}
+              auth={auth}
+              locale={locale}
+              onBack={() => setAmendmentRequestId(null)}
+              onDone={() => void load(auth)}
+              onDirtyChange={setOfferDirty}
+            />
+          )}
+        {view === "Requests" &&
+          cancelRequestId &&
+          inbox.find((r) => r.id === cancelRequestId) && (
+            <CancellationWorkspace
+              key={cancelRequestId}
+              request={inbox.find((r) => r.id === cancelRequestId)!}
+              auth={auth}
+              locale={locale}
+              onBack={() => setCancelRequestId(null)}
+              onDone={() => void load(auth)}
+              onDirtyChange={setOfferDirty}
+            />
+          )}
+        {view === "Requests" &&
+          !amendmentRequestId &&
+          !(cancelRequestId && inbox.find((r) => r.id === cancelRequestId)) && (
+            <>
               <p>
                 {t(
-                  "Availability may be checked manually while partner integrations are being connected.",
-                  "Наличие можно проверить вручную до подключения партнёров.",
-                  "Partnyor inteqrasiyaları qoşulana qədər mövcudluğu manual yoxlaya bilərsiniz.",
+                  "Staff handle every change and cancellation. For changes, describe the agreed arrangement in the response.",
+                  "Все изменения и отмены обрабатывает сотрудник. Для изменений опишите согласованный вариант в ответе.",
+                  "Hər dəyişiklik və ləğvi əməkdaş idarə edir. Dəyişiklik üçün razılaşdırılmış detalları cavabda qeyd edin.",
                 )}
               </p>
-            </div>
-            {reservations
-              .filter((b) => filter === "ALL" || b.status === filter)
-              .map((b) => (
-                <article key={b.id} className="reservation">
-                  <div className="reservation-title">
-                    <div>
-                      <small>{b.id}</small>
-                      <h2>
-                        {(() => {
-                          try {
-                            const input = JSON.parse(b.quotePayload).input;
-                            if (input.customDays)
-                              return t(
-                                "Custom journey",
-                                "Индивидуальный маршрут",
-                                "Fərdi səfər",
-                              );
-                            const slug = input.slug;
-                            const tour = catalog.find((t) => t.slug === slug);
-                            return tour
-                              ? locale === "az"
-                                ? tour.titleAz
-                                : locale === "ru"
-                                  ? tour.titleRu
-                                  : tour.titleEn
-                              : b.title;
-                          } catch {
-                            return b.title;
-                          }
-                        })()}
-                      </h2>
-                      <p>
-                        {b.departure} · {b.total} {b.currency} ·{" "}
-                        {t("Paid", "Оплачено", "Ödənilib")}: {b.paid}{" "}
-                        {b.currency}
-                      </p>
-                    </div>
-                    <strong className="state">{statuses[b.status]}</strong>
-                  </div>
-                  <p className="customer-note">
-                    {b.customerNote ||
-                      t(
-                        "No special notes.",
-                        "Без пожеланий.",
-                        "Xüsusi qeyd yoxdur.",
-                      )}
-                  </p>
-                  <details>
-                    <summary>
+              {inbox.map((r) => (
+                <article key={r.id} className="reservation">
+                  <small>{r.bookingId}</small>
+                  <h2>
+                    {r.kind === "CANCEL"
+                      ? t("Cancellation", "Отмена", "Ləğv")
+                      : t(
+                          "Change request",
+                          "Изменение",
+                          "Dəyişiklik sorğusu",
+                        )}{" "}
+                    · {r.status}
+                  </h2>
+                  <p className="customer-note">{r.message}</p>
+                  {r.kind === "CANCEL" && (
+                    <button onClick={() => setCancelRequestId(r.id)}>
                       {t(
-                        "Service choices",
-                        "Выбранные услуги",
-                        "Xidmət seçimləri",
+                        "Review cancellation",
+                        "Проверить отмену",
+                        "Ləğvə bax",
                       )}
-                    </summary>
-                    <QuoteDetails booking={b} t={t} />
-                  </details>
-                  {b.operatorNote && (
-                    <p>
-                      {t("Office response", "Ответ офиса", "Ofisin cavabı")}:{" "}
-                      {b.operatorNote}
+                    </button>
+                  )}
+                  {r.kind === "CHANGE" && (
+                    <button onClick={() => setAmendmentRequestId(r.id)}>
+                      {t(
+                        "Review contract amendment",
+                        "Проверить изменение договора",
+                        "Müqavilə dəyişikliyini hazırla",
+                      )}
+                    </button>
+                  )}
+                  {r.response && <p>{r.response}</p>}
+                  {r.status === "PENDING" && r.kind === "CHANGE" && (
+                    <details>
+                      <summary>
+                        {t(
+                          "Before contract: revise dates and pricing",
+                          "До договора: обновить даты и стоимость",
+                          "Müqavilədən əvvəl: tarix və qiyməti yenilə",
+                        )}
+                      </summary>
+                      <form
+                        onChange={() =>
+                          setAmendments((current) => {
+                            const next = { ...current };
+                            delete next[r.id];
+                            return next;
+                          })
+                        }
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          if (busy) return;
+                          const f = new FormData(e.currentTarget);
+                          const booking = reservations.find(
+                            (b) => b.id === r.bookingId,
+                          );
+                          if (!booking) return;
+                          setBusy(true);
+                          setError("");
+                          try {
+                            const input = JSON.parse(
+                              booking.quotePayload,
+                            ).input;
+                            const q = await api<{
+                              id: string;
+                              total: number;
+                              currency: string;
+                            }>("/api/v1/quotes", auth, {
+                              ...input,
+                              date: f.get("date"),
+                              pax: Number(f.get("pax")),
+                              hotel: f.get("hotel"),
+                            });
+                            setAmendments((a) => ({ ...a, [r.id]: q }));
+                          } catch (e) {
+                            setError(problem(e));
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        <label>
+                          {t(
+                            "New departure",
+                            "Новая дата",
+                            "Yeni başlama tarixi",
+                          )}
+                          <input
+                            name="date"
+                            type="date"
+                            required
+                            defaultValue={
+                              reservations.find((b) => b.id === r.bookingId)
+                                ?.departure
+                            }
+                          />
+                        </label>
+                        <label>
+                          {t("Travellers", "Участники", "Səyahətçilər")}
+                          <input
+                            name="pax"
+                            type="number"
+                            min={1}
+                            max={12}
+                            defaultValue={(() => {
+                              try {
+                                return JSON.parse(
+                                  reservations.find((b) => b.id === r.bookingId)
+                                    ?.quotePayload || "{}",
+                                ).input.pax;
+                              } catch {
+                                return 2;
+                              }
+                            })()}
+                            required
+                          />
+                        </label>
+                        <label>
+                          {t(
+                            "Hotel category",
+                            "Категория отеля",
+                            "Otel kateqoriyası",
+                          )}
+                          <select
+                            name="hotel"
+                            defaultValue={(() => {
+                              try {
+                                return JSON.parse(
+                                  reservations.find((b) => b.id === r.bookingId)
+                                    ?.quotePayload || "{}",
+                                ).input.hotel;
+                              } catch {
+                                return "comfort";
+                              }
+                            })()}
+                          >
+                            <option value="standard">
+                              {t("Standard", "Стандарт", "Standart")}
+                            </option>
+                            <option value="comfort">
+                              {t("Comfort", "Комфорт", "Komfort")}
+                            </option>
+                            <option value="premium">Premium</option>
+                          </select>
+                        </label>
+                        <button disabled={busy}>
+                          {t(
+                            "Calculate revised quote",
+                            "Рассчитать новую цену",
+                            "Yeni qiyməti hesabla",
+                          )}
+                        </button>
+                      </form>
+                    </details>
+                  )}
+                  {amendments[r.id] && (
+                    <p className="customer-note">
+                      {t("Revised total", "Новая сумма", "Yenilənmiş məbləğ")}:{" "}
+                      {amendments[r.id].total} {amendments[r.id].currency} ·{" "}
+                      {amendments[r.id].id.slice(0, 8)}
                     </p>
                   )}
-                  {b.status === "PENDING_REVIEW" && (
+                  {r.status === "PENDING" && (
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
                         const f = new FormData(e.currentTarget);
-                        const submitter = (e.nativeEvent as SubmitEvent)
+                        const button = (e.nativeEvent as SubmitEvent)
                           .submitter as HTMLButtonElement;
+                        if (
+                          button.value === "accept" &&
+                          r.kind === "CHANGE" &&
+                          !amendments[r.id]
+                        ) {
+                          setError(
+                            t(
+                              "Calculate a replacement quote before accepting a change.",
+                              "Рассчитайте новую цену перед принятием изменения.",
+                              "Dəyişikliyi qəbul etməzdən əvvəl yeni qiyməti hesablayın.",
+                            ),
+                          );
+                          return;
+                        }
                         void decision(
-                          "/api/v1/operations/bookings/" + b.id + "/review",
-                          submitter.value === "approve",
+                          "/api/v1/operations/requests/" + r.id + "/resolve",
+                          button.value === "accept",
                           String(f.get("note")),
+                          amendments[r.id]?.id,
                         );
                       }}
                     >
                       <label>
                         {t(
-                          "Availability check and response to customer",
-                          "Проверка наличия и ответ клиенту",
-                          "Mövcudluq yoxlaması və müştəriyə cavab",
+                          "Response to customer",
+                          "Ответ клиенту",
+                          "Müştəriyə cavab",
                         )}
                         <textarea
                           name="note"
+                          required
                           minLength={3}
                           maxLength={2000}
-                          required
                           rows={3}
                         />
                       </label>
                       <div className="decision-actions">
-                        <button name="decision" value="approve" disabled={busy}>
-                          {t(
-                            "Approve · allow demo payment",
-                            "Одобрить · открыть демо-оплату",
-                            "Təsdiqlə · demo ödənişi aç",
-                          )}
+                        <button
+                          value="accept"
+                          disabled={
+                            busy ||
+                            r.kind === "CANCEL" ||
+                            reservations.some(
+                              (b) =>
+                                b.id === r.bookingId &&
+                                (b.paid > 0 || b.status === "CONFIRMED"),
+                            )
+                          }
+                        >
+                          {t("Accept request", "Принять", "Sorğunu qəbul et")}
                         </button>
                         <button
-                          name="decision"
-                          value="reject"
-                          disabled={busy}
+                          value="decline"
                           className="reject"
+                          disabled={busy}
                         >
-                          {t("Reject request", "Отклонить", "Sorğunu rədd et")}
+                          {t(
+                            "Decline request",
+                            "Отклонить",
+                            "Sorğunu qəbul etmə",
+                          )}
                         </button>
                       </div>
                     </form>
                   )}
-                  {b.status === "CANCELLED" && b.paid > 0 && (
-                    <p className="error">
-                      {t(
-                        "Manual refund review required. Demo funds only.",
-                        "Нужна ручная проверка возврата. Только демо-средства.",
-                        "Manual geri ödəniş yoxlaması tələb olunur. Yalnız demo məbləğidir.",
-                      )}
-                    </p>
-                  )}
-                  <button
-                    className="history-button"
-                    onClick={async () => {
-                      try {
-                        const events = await api<Audit[]>(
-                          "/api/v1/operations/bookings/" + b.id + "/audit",
-                          auth,
-                        );
-                        setHistory((h) => ({ ...h, [b.id]: events }));
-                      } catch (e) {
-                        setError(problem(e));
-                      }
-                    }}
-                  >
-                    {t(
-                      "Show audit history",
-                      "История действий",
-                      "Əməliyyat tarixçəsini göstər",
-                    )}
-                  </button>
-                  {history[b.id] && (
-                    <ol className="audit">
-                      {history[b.id].map((event, i) => (
-                        <li key={i}>
-                          <strong>{event.action}</strong> · {event.actor}
-                          <p>{event.note}</p>
-                          <small>
-                            {new Date(event.created_at).toLocaleString()}
-                          </small>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
                 </article>
               ))}
-            {!reservations.some(
-              (b) => filter === "ALL" || b.status === filter,
-            ) && (
-              <div className="empty">
-                {t(
-                  "No matching reservations.",
-                  "Нет подходящих бронирований.",
-                  "Bu statusda rezervasiya yoxdur.",
-                )}
-              </div>
-            )}
-          </>
-        )}
-        {view === "Requests" && (
-          <>
-            <p>
-              {t(
-                "Staff handle every change and cancellation. For changes, describe the agreed arrangement in the response.",
-                "Все изменения и отмены обрабатывает сотрудник. Для изменений опишите согласованный вариант в ответе.",
-                "Hər dəyişiklik və ləğvi əməkdaş idarə edir. Dəyişiklik üçün razılaşdırılmış detalları cavabda qeyd edin.",
+              {!inbox.length && (
+                <div className="empty">
+                  {t(
+                    "No requests yet.",
+                    "Запросов пока нет.",
+                    "Hələ sorğu yoxdur.",
+                  )}
+                </div>
               )}
-            </p>
-            {inbox.map((r) => (
-              <article key={r.id} className="reservation">
-                <small>{r.bookingId}</small>
-                <h2>
-                  {r.kind === "CANCEL"
-                    ? t("Cancellation", "Отмена", "Ləğv")
-                    : t(
-                        "Change request",
-                        "Изменение",
-                        "Dəyişiklik sorğusu",
-                      )}{" "}
-                  · {r.status}
-                </h2>
-                <p className="customer-note">{r.message}</p>
-                {r.response && <p>{r.response}</p>}
-                {r.status === "PENDING" && r.kind === "CHANGE" && (
-                  <details>
-                    <summary>
-                      {t(
-                        "Prepare revised dates and pricing",
-                        "Обновить даты и стоимость",
-                        "Yeni tarix və qiyməti hazırla",
-                      )}
-                    </summary>
-                    <form
-                      onChange={() =>
-                        setAmendments((current) => {
-                          const next = { ...current };
-                          delete next[r.id];
-                          return next;
-                        })
-                      }
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        if (busy) return;
-                        const f = new FormData(e.currentTarget);
-                        const booking = reservations.find(
-                          (b) => b.id === r.bookingId,
-                        );
-                        if (!booking) return;
-                        setBusy(true);
-                        setError("");
-                        try {
-                          const input = JSON.parse(booking.quotePayload).input;
-                          const q = await api<{
-                            id: string;
-                            total: number;
-                            currency: string;
-                          }>("/api/v1/quotes", auth, {
-                            ...input,
-                            date: f.get("date"),
-                            pax: Number(f.get("pax")),
-                            hotel: f.get("hotel"),
-                          });
-                          setAmendments((a) => ({ ...a, [r.id]: q }));
-                        } catch (e) {
-                          setError(problem(e));
-                        } finally {
-                          setBusy(false);
-                        }
-                      }}
-                    >
-                      <label>
-                        {t(
-                          "New departure",
-                          "Новая дата",
-                          "Yeni başlama tarixi",
-                        )}
-                        <input
-                          name="date"
-                          type="date"
-                          required
-                          defaultValue={
-                            reservations.find((b) => b.id === r.bookingId)
-                              ?.departure
-                          }
-                        />
-                      </label>
-                      <label>
-                        {t("Travellers", "Участники", "Səyahətçilər")}
-                        <input
-                          name="pax"
-                          type="number"
-                          min={1}
-                          max={12}
-                          defaultValue={(() => {
-                            try {
-                              return JSON.parse(
-                                reservations.find((b) => b.id === r.bookingId)
-                                  ?.quotePayload || "{}",
-                              ).input.pax;
-                            } catch {
-                              return 2;
-                            }
-                          })()}
-                          required
-                        />
-                      </label>
-                      <label>
-                        {t(
-                          "Hotel category",
-                          "Категория отеля",
-                          "Otel kateqoriyası",
-                        )}
-                        <select
-                          name="hotel"
-                          defaultValue={(() => {
-                            try {
-                              return JSON.parse(
-                                reservations.find((b) => b.id === r.bookingId)
-                                  ?.quotePayload || "{}",
-                              ).input.hotel;
-                            } catch {
-                              return "comfort";
-                            }
-                          })()}
-                        >
-                          <option value="standard">
-                            {t("Standard", "Стандарт", "Standart")}
-                          </option>
-                          <option value="comfort">
-                            {t("Comfort", "Комфорт", "Komfort")}
-                          </option>
-                          <option value="premium">Premium</option>
-                        </select>
-                      </label>
-                      <button disabled={busy}>
-                        {t(
-                          "Calculate revised quote",
-                          "Рассчитать новую цену",
-                          "Yeni qiyməti hesabla",
-                        )}
-                      </button>
-                    </form>
-                  </details>
-                )}
-                {amendments[r.id] && (
-                  <p className="customer-note">
-                    {t("Revised total", "Новая сумма", "Yenilənmiş məbləğ")}:{" "}
-                    {amendments[r.id].total} {amendments[r.id].currency} ·{" "}
-                    {amendments[r.id].id.slice(0, 8)}
-                  </p>
-                )}
-                {r.status === "PENDING" && (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const f = new FormData(e.currentTarget);
-                      const button = (e.nativeEvent as SubmitEvent)
-                        .submitter as HTMLButtonElement;
-                      if (
-                        button.value === "accept" &&
-                        r.kind === "CHANGE" &&
-                        !amendments[r.id]
-                      ) {
-                        setError(
-                          t(
-                            "Calculate a replacement quote before accepting a change.",
-                            "Рассчитайте новую цену перед принятием изменения.",
-                            "Dəyişikliyi qəbul etməzdən əvvəl yeni qiyməti hesablayın.",
-                          ),
-                        );
-                        return;
-                      }
-                      void decision(
-                        "/api/v1/operations/requests/" + r.id + "/resolve",
-                        button.value === "accept",
-                        String(f.get("note")),
-                        amendments[r.id]?.id,
-                      );
-                    }}
-                  >
-                    <label>
-                      {t(
-                        "Response to customer",
-                        "Ответ клиенту",
-                        "Müştəriyə cavab",
-                      )}
-                      <textarea
-                        name="note"
-                        required
-                        minLength={3}
-                        maxLength={2000}
-                        rows={3}
-                      />
-                    </label>
-                    <div className="decision-actions">
-                      <button value="accept" disabled={busy}>
-                        {t("Accept request", "Принять", "Sorğunu qəbul et")}
-                      </button>
-                      <button
-                        value="decline"
-                        className="reject"
-                        disabled={busy}
-                      >
-                        {t(
-                          "Decline request",
-                          "Отклонить",
-                          "Sorğunu qəbul etmə",
-                        )}
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </article>
-            ))}
-            {!inbox.length && (
-              <div className="empty">
-                {t(
-                  "No requests yet.",
-                  "Запросов пока нет.",
-                  "Hələ sorğu yoxdur.",
-                )}
-              </div>
-            )}
-          </>
+            </>
+          )}
+        {["Partners", "Notifications"].includes(view) && (
+          <OfficeManagement
+            key={view}
+            module={view as "Partners" | "Notifications"}
+            auth={auth}
+            locale={locale}
+            onDirtyChange={setOfferDirty}
+          />
         )}
-        {view === "Notifications" && (
-          <>
-            <p>
-              {t(
-                "Email uses Gmail SMTP when configured. WhatsApp and push are queued until their providers are connected. SMS is not used.",
-                "Email использует Gmail SMTP после настройки. WhatsApp и push ожидают подключения. SMS не используется.",
-                "Email konfiqurasiyadan sonra Gmail SMTP ilə göndərilir. WhatsApp və push provayder qoşulanadək növbədə qalır. SMS istifadə edilmir.",
-              )}
-            </p>
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>{t("Event", "Событие", "Hadisə")}</th>
-                    <th>{t("Channel", "Канал", "Kanal")}</th>
-                    <th>{t("State", "Состояние", "Vəziyyət")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {outbox.map((n) => (
-                    <tr key={n.id}>
-                      <td>
-                        {n.event}
-                        <small>{n.booking_id}</small>
-                      </td>
-                      <td>{n.channel}</td>
-                      <td>
-                        {n.status === "WAITING_CONFIGURATION"
-                          ? t(
-                              "Provider not connected",
-                              "Провайдер не подключён",
-                              "Provayder qoşulmayıb",
-                            )
-                          : n.status}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
+        {view === "Finance" && (
+          <RefundWorkspace
+            auth={auth}
+            locale={locale}
+            onDirtyChange={setOfferDirty}
+          />
         )}
         {view === "Events" && (
           <EventsWorkspace
