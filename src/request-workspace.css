@@ -220,29 +220,77 @@
   white-space: nowrap;
 }
 .rq-state {
+  --dot: #55735c;
+  --tint: #edf3ee;
+  --ink: #2c4a35;
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  padding: 3px 10px 3px 9px;
+  background: var(--tint);
+  color: var(--ink);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
   white-space: nowrap;
 }
 .rq-state i {
   flex-shrink: 0;
   width: 8px;
   height: 8px;
-  background: #55735c;
+  background: var(--dot);
   border-radius: 50%;
 }
-.rq-state-NEEDS_REVIEW i,
-.rq-state-AWAITING_PAYMENT i {
-  background: #e68a12;
+/* One hue per stage, so the list can be scanned by colour as well as by label. */
+.rq-state-NEEDS_REVIEW {
+  --dot: #2a78d6;
+  --tint: #e6f0fc;
+  --ink: #17498a;
 }
-.rq-state-CANCELLATION_REVIEW i,
-.rq-state-CHANGE_REVIEW i {
-  background: #c34737;
+.rq-state-IN_PREPARATION {
+  --dot: #6250d6;
+  --tint: #edeafb;
+  --ink: #3f3290;
 }
-.rq-state-CANCELLED i,
-.rq-state-REJECTED i {
-  background: #8c929a;
+.rq-state-OFFER_SENT {
+  --dot: #0f9aa8;
+  --tint: #e0f3f5;
+  --ink: #0b5c66;
+}
+.rq-state-CONTRACT_ACCEPTED {
+  --dot: #7a9a1e;
+  --tint: #eef4d9;
+  --ink: #4b5f10;
+}
+.rq-state-AWAITING_PAYMENT {
+  --dot: #e68a12;
+  --tint: #fdf0dc;
+  --ink: #8a4f06;
+}
+.rq-state-CONFIRMED {
+  --dot: #2f8f3a;
+  --tint: #e3f3e5;
+  --ink: #1c5a24;
+}
+.rq-state-CANCELLATION_REVIEW {
+  --dot: #c34737;
+  --tint: #fbe7e4;
+  --ink: #85281c;
+}
+.rq-state-CHANGE_REVIEW {
+  --dot: #c2447f;
+  --tint: #fbe6f0;
+  --ink: #7f2455;
+}
+.rq-state-CANCELLED {
+  --dot: #8c929a;
+  --tint: #eceef0;
+  --ink: #4f565f;
+}
+.rq-state-REJECTED {
+  --dot: #6b4f43;
+  --tint: #efe8e4;
+  --ink: #4a352c;
 }
 .rq-empty {
   position: absolute;
