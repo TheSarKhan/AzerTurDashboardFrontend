@@ -213,12 +213,12 @@ export function EventsWorkspace({
           <form onSubmit={(e) => { e.preventDefault(); void save(false); }}>
             <fieldset>
               <legend>{t("Text (plain, no markup)", "Текст (без разметки)", "Mətn (işarələmə olmadan)")}</legend>
-              <label>{t("Title · English", "Название · английский", "Başlıq · İngiliscə")}{input("titleEn", { required: true, maxLength: 160 })}</label>
-              <label>{t("Title · Azerbaijani", "Название · азербайджанский", "Başlıq · Azərbaycanca")}{input("titleAz", { required: true, maxLength: 160 })}</label>
-              <label>{t("Title · Russian (optional)", "Название · русский (необязательно)", "Başlıq · Rusca (könüllü)")}{input("titleRu", { maxLength: 160 })}</label>
-              <label>{t("Description · English", "Описание · английский", "Təsvir · İngiliscə")}<textarea rows={3} maxLength={4000} value={f.descriptionEn} onChange={(e) => set("descriptionEn", e.target.value)} /></label>
-              <label>{t("Description · Azerbaijani", "Описание · азербайджанский", "Təsvir · Azərbaycanca")}<textarea rows={3} maxLength={4000} value={f.descriptionAz} onChange={(e) => set("descriptionAz", e.target.value)} /></label>
-              <label>{t("Description · Russian (optional)", "Описание · русский (необязательно)", "Təsvir · Rusca (könüllü)")}<textarea rows={3} maxLength={4000} value={f.descriptionRu} onChange={(e) => set("descriptionRu", e.target.value)} /></label>
+              <label>{t("Title, English", "Название, английский", "Başlıq, İngiliscə")}{input("titleEn", { required: true, maxLength: 160 })}</label>
+              <label>{t("Title, Azerbaijani", "Название, азербайджанский", "Başlıq, Azərbaycanca")}{input("titleAz", { required: true, maxLength: 160 })}</label>
+              <label>{t("Title, Russian (optional)", "Название, русский (необязательно)", "Başlıq, Rusca (könüllü)")}{input("titleRu", { maxLength: 160 })}</label>
+              <label>{t("Description, English", "Описание, английский", "Təsvir, İngiliscə")}<textarea rows={3} maxLength={4000} value={f.descriptionEn} onChange={(e) => set("descriptionEn", e.target.value)} /></label>
+              <label>{t("Description, Azerbaijani", "Описание, азербайджанский", "Təsvir, Azərbaycanca")}<textarea rows={3} maxLength={4000} value={f.descriptionAz} onChange={(e) => set("descriptionAz", e.target.value)} /></label>
+              <label>{t("Description, Russian (optional)", "Описание, русский (необязательно)", "Təsvir, Rusca (könüllü)")}<textarea rows={3} maxLength={4000} value={f.descriptionRu} onChange={(e) => set("descriptionRu", e.target.value)} /></label>
             </fieldset>
             <fieldset>
               <legend>{t("Where", "Где", "Harada")}</legend>
@@ -262,7 +262,7 @@ export function EventsWorkspace({
           <aside>
             <h3>{t("How customers see it", "Как увидят клиенты", "Müştərilər necə görəcək")}</h3>
             <article className="events-card">
-              <p className="cat">{categories[f.category]} · {cityName(f.citySlug)}</p>
+              <p className="cat">{categories[f.category]}, {cityName(f.citySlug)}</p>
               <h4>{title({ titleEn: f.titleEn, titleRu: f.titleRu || null, titleAz: f.titleAz }) || "—"}</h4>
               <p>{previewStart ? when({ startsAt: body(f).startsAt, endsAt: body(f).endsAt, timeKnown: f.timeKnown }) : "—"}</p>
               <p>{f.venueName || "—"}</p>
@@ -272,7 +272,7 @@ export function EventsWorkspace({
               <>
                 <h3>{t("History", "История", "Tarixçə")}</h3>
                 <ul className="events-audit">
-                  {edit.audit.map((a, i) => <li key={i}><b>{a.action}</b> · {a.actor}<small>{formatDateTime(a.created_at)}</small>{a.note && <em>{a.note}</em>}</li>)}
+                  {edit.audit.map((a, i) => <li key={i}><b>{a.action}</b>, {a.actor}<small>{formatDateTime(a.created_at)}</small>{a.note && <em>{a.note}</em>}</li>)}
                 </ul>
               </>
             )}
@@ -315,10 +315,10 @@ export function EventsWorkspace({
             <tbody>
               {page.items.map((e) => (
                 <tr key={e.id}>
-                  <td><strong>{title(e)}</strong><small>{categories[e.category]} · {cityName(e.citySlug)} · {e.venueName}</small></td>
+                  <td><strong>{title(e)}</strong><small>{categories[e.category]}, {cityName(e.citySlug)}, {e.venueName}</small></td>
                   <td>{when(e)}</td>
                   <td><span className={"badge " + e.status}>{statuses[e.status]}</span></td>
-                  <td>{e.source === "EXTERNAL" ? (e.adminLocked ? t("External · edited", "Внешний · изменён", "Xarici · dəyişdirilib") : t("External", "Внешний", "Xarici")) : t("Office", "Офис", "Ofis")}{e.sourceNote && <small title={e.sourceNote}>{e.sourceNote.slice(0, 40)}{e.sourceNote.length > 40 ? "…" : ""}</small>}</td>
+                  <td>{e.source === "EXTERNAL" ? (e.adminLocked ? t("External, edited", "Внешний, изменён", "Xarici, dəyişdirilib") : t("External", "Внешний", "Xarici")) : t("Office", "Офис", "Ofis")}{e.sourceNote && <small title={e.sourceNote}>{e.sourceNote.slice(0, 40)}{e.sourceNote.length > 40 ? "…" : ""}</small>}</td>
                   <td className="row-actions">
                     <button className="small" onClick={() => void open(e)} aria-label={t("Edit", "Изменить", "Dəyiş")}><Pencil size={14} /></button>
                     {(e.status === "DRAFT" || e.status === "PENDING_REVIEW") && <button className="small" disabled={busy} onClick={() => void act(e, "publish")}>{t("Publish", "Опубликовать", "Dərc et")}</button>}

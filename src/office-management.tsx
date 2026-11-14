@@ -6,6 +6,17 @@ import {
   Handshake,
   Bell,
   ArrowRight,
+  Car,
+  BedDouble,
+  Plane,
+  Bus,
+  Flower2,
+  CalendarDays,
+  Utensils,
+  Tickets,
+  Camera,
+  Phone,
+  Mail,
 } from "lucide-react";
 import { api, type Locale } from "./api/client";
 import "./office-management.css";
@@ -92,16 +103,33 @@ export default function OfficeManagement({
   const kindNames: Record<string, string> = {
     HOTEL: t("Hotel", "Отель", "Otel"),
     TRANSPORT: t("Transport", "Транспорт", "Nəqliyyat"),
-    GUIDE: t("Guide", "Гид", "Gid"),
+    GUIDE: t("Guide", "Гид", "Bələdçi"),
     ACTIVITY: t("Activity", "Активность", "Fəaliyyət"),
     OTHER: t("Other", "Другое", "Digər"),
   };
   const serviceNames: Record<string, string> = {
-    hotel: kindNames.HOTEL,
-    transport: kindNames.TRANSPORT,
-    guide: kindNames.GUIDE,
-    transfer: t("Transfer", "Трансфер", "Transfer"),
-    activity: kindNames.ACTIVITY,
+    hotel: t("Hotel", "Отель", "Otel"),
+    transport: t("Car with driver", "Автомобиль с водителем", "Sürücülü avtomobil"),
+    guide: t("Local guide", "Местный гид", "Yerli bələdçi"),
+    transfer: t("Airport transfer", "Трансфер из аэропорта", "Hava limanı transferi"),
+    intercity: t("Transfer to the next region", "Трансфер в следующий регион", "Növbəti rayona transfer"),
+    activity: t("Local experience", "Местное впечатление", "Yerli təcrübə"),
+    event: t("Events", "Мероприятия", "Tədbirlər"),
+    meals: t("Local meals", "Местная кухня", "Yerli yeməklər"),
+    tickets: t("Entrance tickets", "Входные билеты", "Giriş biletləri"),
+    photographer: t("Photographer", "Фотограф", "Fotoqraf"),
+  };
+  const serviceIcons: Record<string, typeof Car> = {
+    hotel: BedDouble,
+    transport: Car,
+    guide: Users,
+    transfer: Plane,
+    intercity: Bus,
+    activity: Flower2,
+    event: CalendarDays,
+    meals: Utensils,
+    tickets: Tickets,
+    photographer: Camera,
   };
   const eventNames: Record<string, string> = {
     AMENDMENT_SENT: t(
@@ -473,6 +501,145 @@ export default function OfficeManagement({
       )}
       {module === "Partners" && (
         <>
+          <h3>
+            {t(
+              "Services and their partners",
+              "Услуги и их партнёры",
+              "Xidmətlər və partnyorları",
+            )}
+          </h3>
+          <p className="om-info">
+            {t(
+              "Open a service to see the partners that provide it.",
+              "Откройте услугу, чтобы увидеть партнёров.",
+              "Xidməti açın, onu təmin edən partnyorlar cədvəldə görünəcək.",
+            )}
+          </p>
+          <div className="om-folders">
+            {Object.keys(serviceNames).map((key) => {
+              const Icon = serviceIcons[key];
+              const needle = query.toLowerCase();
+              const rows = services.filter(
+                (x) =>
+                  x.service_key === key &&
+                  (x.name + x.partner_name + x.location).toLowerCase().includes(needle),
+              );
+              // One row per partner service; the same service in several currencies is shown together.
+              const groups = new Map<string, PartnerService[]>();
+              for (const x of rows) {
+                const id = x.partner_id + "|" + x.name + "|" + x.location;
+                groups.set(id, [...(groups.get(id) || []), x]);
+              }
+              const list = [...groups.values()].map((g) =>
+                g.sort((a, b) => a.currency.localeCompare(b.currency)),
+              );
+              const partnerCount = new Set(rows.map((x) => x.partner_id)).size;
+              return (
+                <details className="om-folder" key={key} open={!!query && rows.length > 0}>
+                  <summary>
+                    <Icon size={20} aria-hidden="true" />
+                    <strong>{serviceNames[key]}</strong>
+                    <span>
+                      {partnerCount} {t("partners", "партнёров", "partnyor")}
+                    </span>
+                    <small>
+                      {list.length} {t("services", "услуг", "xidmət")}
+                    </small>
+                  </summary>
+                  <div className="om-table">
+                    <table>
+                      <thead>
+                        <tr>
+                          {[
+                            t("Partner", "Партнёр", "Partnyor"),
+                            t("Service", "Услуга", "Xidmət"),
+                            t("Location", "Место", "Məkan"),
+                            t("Unit price", "Цена единицы", "Vahid qiyməti"),
+                            t("Dates", "Даты", "Tarixlər"),
+                            t("Capacity", "Доступно", "Tutum"),
+                            t("Contact", "Контакты", "Əlaqə"),
+                            t("Status", "Статус", "Status"),
+                            "",
+                          ].map((x, i) => (
+                            <th key={i}>{x}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {list.map((g) => {
+                          const x = g[0];
+                          const partner = partners.find((p) => p.id === x.partner_id);
+                          return (
+                            <tr key={x.id}>
+                              <td>
+                                <strong>{x.partner_name}</strong>
+                                {partner && <small>{kindNames[partner.kind]}</small>}
+                              </td>
+                              <td>{x.name}</td>
+                              <td>{x.location}</td>
+                              <td>
+                                {g.map((v) => (
+                                  <div key={v.id}>
+                                    {(v.price_minor / 100).toFixed(2)} {v.currency}
+                                  </div>
+                                ))}
+                              </td>
+                              <td>
+                                {String(x.available_from).slice(0, 10)} —{" "}
+                                {String(x.available_to).slice(0, 10)}
+                              </td>
+                              <td>{x.capacity}</td>
+                              <td>
+                                {partner?.phone && (
+                                  <div className="om-contact">
+                                    <Phone size={13} aria-hidden="true" />
+                                    <a href={"tel:" + partner.phone}>{partner.phone}</a>
+                                  </div>
+                                )}
+                                {partner?.email && (
+                                  <div className="om-contact">
+                                    <Mail size={13} aria-hidden="true" />
+                                    <a href={"mailto:" + partner.email}>{partner.email}</a>
+                                  </div>
+                                )}
+                              </td>
+                              <td>
+                                {x.active && x.partner_active
+                                  ? t("Active", "Активен", "Aktiv")
+                                  : t("Inactive", "Неактивен", "Deaktiv")}
+                              </td>
+                              <td>
+                                <button onClick={() => edit("service", x)}>
+                                  {t("Edit", "Изменить", "Düzəlt")}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {!list.length && (
+                      <p className="om-empty">
+                        {t(
+                          "No partner offers this service yet.",
+                          "Пока нет партнёров с этой услугой.",
+                          "Bu xidməti verən partnyor hələ yoxdur.",
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+          <details className="om-folder om-allpartners">
+            <summary>
+              <Handshake size={20} aria-hidden="true" />
+              <strong>{t("All partners", "Все партнёры", "Bütün partnyorlar")}</strong>
+              <span>
+                {partners.length} {t("partners", "партнёров", "partnyor")}
+              </span>
+            </summary>
           <div className="om-partners">
             {partners
               .filter((x) =>
@@ -483,7 +650,7 @@ export default function OfficeManagement({
                   <Handshake size={22} />
                   <h3>{x.name}</h3>
                   <p>
-                    {kindNames[x.kind]} ·{" "}
+                    {kindNames[x.kind]},{" "}
                     {x.active
                       ? t("Active", "Активен", "Aktiv")
                       : t("Inactive", "Неактивен", "Deaktiv")}
@@ -504,79 +671,7 @@ export default function OfficeManagement({
                 </article>
               ))}
           </div>
-          <h3>
-            {t(
-              "Services & availability",
-              "Услуги и доступность",
-              "Xidmətlər və mövcudluq",
-            )}
-          </h3>
-          <div className="om-table">
-            <table>
-              <thead>
-                <tr>
-                  {[
-                    t(
-                      "Service / partner",
-                      "Услуга / партнёр",
-                      "Xidmət / partnyor",
-                    ),
-                    t("Location", "Место", "Məkan"),
-                    t("Unit price", "Цена единицы", "Vahid qiyməti"),
-                    t("Dates", "Даты", "Tarixlər"),
-                    t("Capacity", "Доступно", "Tutum"),
-                    "",
-                  ].map((x, i) => (
-                    <th key={i}>{x}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {services
-                  .filter((x) =>
-                    (x.name + x.partner_name + x.location)
-                      .toLowerCase()
-                      .includes(query.toLowerCase()),
-                  )
-                  .map((x) => (
-                    <tr key={x.id}>
-                      <td>
-                        {x.name}
-                        <small>
-                          {x.partner_name}
-                          {!x.active || !x.partner_active
-                            ? " · " + t("Inactive", "Неактивен", "Deaktiv")
-                            : ""}
-                        </small>
-                      </td>
-                      <td>{x.location}</td>
-                      <td>
-                        {(x.price_minor / 100).toFixed(2)} {x.currency}
-                      </td>
-                      <td>
-                        {String(x.available_from).slice(0, 10)} —{" "}
-                        {String(x.available_to).slice(0, 10)}
-                      </td>
-                      <td>{x.capacity}</td>
-                      <td>
-                        <button onClick={() => edit("service", x)}>
-                          {t("Edit", "Изменить", "Düzəlt")}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-            {!services.length && (
-              <p className="om-empty">
-                {t(
-                  "No services added yet.",
-                  "Услуг пока нет.",
-                  "Hələ xidmət əlavə edilməyib.",
-                )}
-              </p>
-            )}
-          </div>
+          </details>
         </>
       )}
       {module === "Notifications" && (
@@ -637,7 +732,7 @@ export default function OfficeManagement({
                               "Обновление поездки",
                               "Səfər yeniliyi",
                             )}{" "}
-                          · #{j.booking_id?.slice(0, 8)}
+                         , #{j.booking_id?.slice(0, 8)}
                         </small>
                       </td>
                       <td>{j.channel}</td>
@@ -927,13 +1022,7 @@ export default function OfficeManagement({
                       name="serviceKey"
                       defaultValue={s?.service_key || "hotel"}
                     >
-                      {[
-                        "hotel",
-                        "transport",
-                        "guide",
-                        "transfer",
-                        "activity",
-                      ].map((x) => (
+                      {Object.keys(serviceNames).map((x) => (
                         <option key={x} value={x}>
                           {kindNames[x] || serviceNames[x] || x}
                         </option>

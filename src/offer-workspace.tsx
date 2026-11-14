@@ -1,10 +1,13 @@
+import { paxRange } from "./pax";
+import { RouteMap } from "./route-map";
 import TravelDocuments from './travel-documents';
 import PartnerPicker from "./partner-picker";
+import type { PartnerService } from "./office-management";
 import { FinanceWorkspace } from "./finance-workspace";
 import RequestWorkspace from "./request-workspace";
 import PaymentWorkspace from "./payment-workspace";
-import ContractWorkspace from "./contract-workspace";
-import { useEffect, useRef, useState } from "react";
+import ContractWorkspace, { type ContractState } from "./contract-workspace";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { navigate, useRoute } from "./route";
 import {
   ArrowLeft,
@@ -15,11 +18,25 @@ import {
   BedDouble,
   Users,
   Plane,
+  Bus,
   Flower2,
+  Mail,
+  Phone,
   X,
   Eye,
   FileText,
   AlertTriangle,
+  Utensils,
+  Tickets,
+  Camera,
+  CalendarDays,
+  CircleCheck,
+  CreditCard,
+  Landmark,
+  Lock,
+  Pencil,
+  Plus,
+  RotateCcw,
 } from "lucide-react";
 import {
   api,
@@ -30,7 +47,15 @@ import {
 } from "./api/client";
 import type { OfferDraft, OfferLine, PublicOffer } from "./offer-types";
 import "./offers.css";
-import { lineAmount } from "./offer-pricing";
+import {
+  DEFAULT_MARGIN,
+  baseOf,
+  lineAmount,
+  lineCost,
+  lineCostAmount,
+  lineMargin,
+  withMargin,
+} from "./offer-pricing";
 import { formatDay, formatDateTime } from "./dates";
 const names: Record<string, string[]> = {
   transport: [
@@ -39,16 +64,58 @@ const names: Record<string, string[]> = {
     "Şəxsi avtomobil və sürücü",
   ],
   hotel: ["Comfort stay", "Проживание", "Qalma yeri"],
-  guide: ["Local guide", "Местный гид", "Yerli gid"],
+  guide: ["Local guide", "Местный гид", "Yerli bələdçi"],
   transfer: ["Airport transfer", "Трансфер", "Hava limanı transferi"],
+  intercity: ["Transfer to the next region", "Трансфер в следующий регион", "Növbəti rayona transfer"],
   activity: ["Local craft experience", "Мастер-класс", "Sənətkarlıq təcrübəsi"],
+  event: ["Event", "Мероприятие", "Tədbir"],
+  meals: ["Local meals", "Местная кухня", "Yerli yeməklər"],
+  tickets: ["Entrance tickets", "Входные билеты", "Giriş biletləri"],
+  photographer: ["Photographer", "Фотограф", "Fotoqraf"],
+};
+const KINDS = [
+  "transport",
+  "hotel",
+  "guide",
+  "transfer",
+  "intercity",
+  "activity",
+  "event",
+  "meals",
+  "tickets",
+  "photographer",
+] as const;
+const UNITS: Record<string, string> = {
+  transport: "day",
+  hotel: "room",
+  guide: "day",
+  transfer: "transfer",
+  intercity: "transfer",
+  activity: "person",
+  event: "person",
+  meals: "person",
+  tickets: "person",
+  photographer: "day",
+};
+const CITIES = ["Baku", "Quba", "Khinalug", "Gabala", "Sheki"];
+const CITY_NAMES: Record<string, [string, string, string]> = {
+  Baku: ["Baku", "Баку", "Bakı"],
+  Quba: ["Quba", "Куба", "Quba"],
+  Khinalug: ["Khinalug", "Хыналыг", "Xınalıq"],
+  Gabala: ["Gabala", "Габала", "Qəbələ"],
+  Sheki: ["Sheki", "Шеки", "Şəki"],
 };
 const icons: Record<string, typeof Car> = {
   transport: Car,
   hotel: BedDouble,
   guide: Users,
   transfer: Plane,
+  intercity: Bus,
   activity: Flower2,
+  event: CalendarDays,
+  meals: Utensils,
+  tickets: Tickets,
+  photographer: Camera,
 };
 const routes: Record<string, string[]> = {
   "quba-khinalug": ["Quba", "Khinalug"],
@@ -58,53 +125,175 @@ const routes: Record<string, string[]> = {
 function initial(b: Booking): OfferDraft {
   const q = JSON.parse(b.quotePayload),
     input = q.input,
-    route = input.cities || routes[input.slug] || ["Baku"];
+    route: string[] = input.cities || routes[input.slug] || ["Baku"],
+    days = route.length,
+    pax = Number(input.pax) || 2;
+  // The customer's estimate is split over the route: a car and a guide for every day, a room for every
+  // night, the airport transfer at the start and the experience on the first day. The office then adjusts
+  // each row. The customer price starts at the customer's estimate (cost plus the default margin).
+  const plan: { places: { city: string; services: string[] }[] }[] | null = Array.isArray(input.plan)
+    ? input.plan
+    : null;
+  const lines: OfferLine[] = [];
+  const add = (
+    kind: string,
+    row: number,
+    quantity: number,
+    nights: number,
+    amount: number,
+    city?: string,
+  ) => {
+    const cost = Math.max(
+      0.01,
+      Math.round((amount / (quantity * nights) / (1 + DEFAULT_MARGIN / 100)) * 100) / 100,
+    );
+    const same = lines.filter((l) => baseOf(l.key) === kind).length;
+    lines.push({
+      key: same ? kind + "-" + (same + 1) : kind,
+      name: names[kind][0] + (city ? ", " + city : ""),
+      quantity,
+      nights,
+      unitPrice: withMargin(cost, DEFAULT_MARGIN),
+      unit: UNITS[kind],
+      supplier: "",
+      location: "",
+      availability: "CONFIRMED",
+      policy: "",
+      internalNote: "",
+      row,
+      costPrice: cost,
+      marginPercent: DEFAULT_MARGIN,
+    });
+  };
+  if (plan) {
+    // Day by day: the customer picked the services for every place. A car, a room and a guide are one
+    // line per day (on the first place that has it); a transfer or an experience is one line per place.
+    const entries = plan.flatMap((d, di) => d.places.map((p) => ({ ...p, day: di + 1 })));
+    const where: Record<string, { row: number; city: string }[]> = {};
+    entries.forEach((e, i) => {
+      for (const kind of e.services) {
+        const perDay = kind === "transport" || kind === "hotel" || kind === "guide";
+        if (perDay && entries.slice(0, i).some((x) => x.day === e.day && x.services.includes(kind))) continue;
+        (where[kind] ||= []).push({ row: i + 1, city: e.city });
+      }
+    });
+    for (const line of q.lines as { label: string; amount: number }[]) {
+      // The transfer line of the estimate holds airport transfers and transfers to the next region.
+      const spots: { row: number; city: string; kind: string }[] =
+        line.label === "transfer"
+          ? [
+              ...(where.transfer || []).map((x) => ({ ...x, kind: "transfer" })),
+              ...(where.intercity || []).map((x) => ({ ...x, kind: "intercity" })),
+            ]
+          : (where[line.label] || []).map((x) => ({ ...x, kind: line.label }));
+      const rooms = Math.ceil(pax / 2);
+      for (const spot of spots) {
+        const share = line.amount / spots.length;
+        if (spot.kind === "hotel") add("hotel", spot.row, rooms, 1, share, spot.city);
+        else if (spot.kind === "activity") add("activity", spot.row, pax, 1, share, spot.city);
+        else add(spot.kind, spot.row, 1, 1, share, spot.city);
+      }
+    }
+    // Events, meals, tickets and a photographer are not in the estimate: they start without a price.
+    for (const kind of ["event", "meals", "tickets", "photographer"])
+      for (const spot of where[kind] || []) {
+        const same = lines.filter((l) => baseOf(l.key) === kind).length;
+        lines.push({
+          key: same ? kind + "-" + (same + 1) : kind,
+          name: names[kind][0] + ", " + spot.city,
+          quantity: UNITS[kind] === "person" ? pax : 1,
+          nights: 1,
+          unitPrice: 0,
+          unit: UNITS[kind],
+          supplier: "",
+          location: "",
+          availability: "CONFIRMED",
+          policy: "",
+          internalNote: "",
+          row: spot.row,
+          costPrice: 0,
+          marginPercent: DEFAULT_MARGIN,
+        });
+      }
+    return {
+      version: 0,
+      sourceQuoteId: b.quoteId,
+      title: "Your custom journey",
+      currency: b.currency,
+      itinerary: entries.map((e) => ({ city: e.city, description: e.city, day: e.day })),
+      returnRoute: "",
+      services: lines,
+      message: "",
+      internalNote: "",
+      startCity: input.startCity ?? "Baku",
+      endCity: input.endCity ?? "Baku",
+    };
+  }
+  for (const line of q.lines as { label: string; amount: number }[]) {
+    const kind = line.label;
+    if (kind === "transport" || kind === "guide")
+      route.forEach((city, i) => add(kind, i + 1, 1, 1, line.amount / days, city));
+    else if (kind === "hotel") {
+      const rooms = Math.ceil(pax / 2),
+        nights = Math.max(1, days - 1);
+      for (let i = 0; i < nights; i++)
+        add(kind, i + 1, rooms, 1, line.amount / nights, route[i]);
+    } else if (kind === "transfer") add(kind, 0, 1, 1, line.amount);
+    else if (kind === "activity") add(kind, 1, pax, 1, line.amount, route[0]);
+  }
   return {
     version: 0,
     sourceQuoteId: b.quoteId,
     title: "Your custom journey",
     currency: b.currency,
-    itinerary: route.map((city: string) => ({ city, description: city })),
+    itinerary: route.map((city: string, i: number) => ({ city, description: city, day: i + 1 })),
     returnRoute: "",
-    services: q.lines.map((line: { label: string; amount: number }) => {
-      const key = line.label;
-      const days = route.length;
-      const quantity =
-        key === "hotel"
-          ? Math.ceil(input.pax / 2)
-          : key === "activity"
-            ? input.pax
-            : key === "transfer"
-              ? 1
-              : days;
-      const nights = key === "hotel" ? Math.max(1, days - 1) : 1;
-      return {
-        key,
-        name: names[key]?.[0] || key,
-        quantity,
-        nights,
-        unitPrice: Math.max(
-          0.000001,
-          Number((line.amount / (quantity * nights)).toFixed(6)),
-        ),
-        unit:
-          key === "hotel"
-            ? "room"
-            : key === "activity"
-              ? "person"
-              : key === "transfer"
-                ? "transfer"
-                : "day",
-        supplier: "",
-        location: "",
-        availability: "NOT_CHECKED",
-        policy: "",
-        internalNote: "",
-      };
-    }),
+    services: lines,
     message: "",
     internalNote: "",
+    startCity: input.startCity ?? "Baku",
+    endCity: input.endCity ?? "Baku",
   };
+}
+/** A number box that keeps what is being typed ("1." on the way to "1.5") and reports valid values. */
+function NumField({
+  value,
+  onCommit,
+  min,
+  max,
+  step,
+  disabled,
+  label,
+}: {
+  value: number;
+  onCommit: (n: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  disabled?: boolean;
+  label: string;
+}) {
+  const [text, setText] = useState(String(value));
+  useEffect(() => {
+    if (Number(text) !== value) setText(String(value));
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <input
+      type="number"
+      inputMode="decimal"
+      aria-label={label}
+      value={text}
+      min={min}
+      max={max}
+      step={step}
+      disabled={disabled}
+      onChange={(e) => {
+        setText(e.target.value);
+        const n = Number(e.target.value);
+        if (e.target.value !== "" && Number.isFinite(n)) onCommit(n);
+      }}
+    />
+  );
 }
 export default function OfferWorkspace({
   auth,
@@ -143,6 +332,8 @@ export default function OfferWorkspace({
     }
   }
   const [receivedMinor, setReceivedMinor] = useState(0);
+  // The customer's contract for the latest offer: once they accept it, the work moves to managing the booking.
+  const [contract, setContract] = useState<ContractState | null>(null);
   const [financeDirty, setFinanceDirty] = useState(false);
   const [paymentDirty, setPaymentDirty] = useState(false);
   const [reject, setReject] = useState(false);
@@ -156,6 +347,7 @@ export default function OfferWorkspace({
     [customer, setCustomer] = useState<{
       name: string;
       email: string;
+      phone?: string | null;
       locale: string;
     } | null>(null),
     [busy, setBusy] = useState(false),
@@ -181,10 +373,6 @@ export default function OfferWorkspace({
     b?.status === "PENDING_REVIEW" && b.paid === 0 && receivedMinor === 0;
   const count = draft?.services.length || 0,
     total = draft?.services.reduce((s, line) => s + lineAmount(line), 0) || 0,
-    checked =
-      draft?.services.filter(
-        (x) => x.availability === "CONFIRMED" && x.supplier.trim(),
-      ).length || 0,
     pending = requests.some(
       (x) => x.bookingId === selected && x.status === "PENDING",
     );
@@ -196,13 +384,9 @@ export default function OfferWorkspace({
       minimumFractionDigits: 0,
     }).format(n);
   const label = (key: string) =>
-    names[key]?.[l === "az" ? 2 : l === "ru" ? 1 : 0] || key;
-  const availability = (value: string) =>
-    value === "CONFIRMED"
-      ? t("Confirmed", "Подтверждено", "Təsdiqlənib")
-      : value === "UNAVAILABLE"
-        ? t("Unavailable", "Недоступно", "Mövcud deyil")
-        : t("Not checked", "Не проверено", "Yoxlanılmayıb");
+    names[baseOf(key)]?.[l === "az" ? 2 : l === "ru" ? 1 : 0] || key;
+  const cityLabel = (city: string) =>
+    CITY_NAMES[city] ? t(...CITY_NAMES[city]) : city;
   function problem(e: unknown) {
     const code = e instanceof Error ? e.message : "";
     return (
@@ -251,9 +435,10 @@ export default function OfferWorkspace({
     setPreviewVersion(0);
     setSentVersion(0);
     setReceivedMinor(0);
+    setContract(null);
     setAudit([]);
     try {
-      const [state, c, booking, payments] = await Promise.all([
+      const [state, c, booking, payments, contractNow] = await Promise.all([
         api<{
           draft: OfferDraft;
           previewVersion: number;
@@ -268,7 +453,9 @@ export default function OfferWorkspace({
           "/api/v1/operations/bookings/" + id + "/payment-context",
           auth,
         ),
+        api<ContractState | null>("/api/v1/operations/bookings/" + id + "/contract", auth).catch(() => null),
       ]);
+      setContract(contractNow);
       setFreshBooking(booking);
       setReceivedMinor(payments.receivedMinor ?? payments.paidMinor);
       setDraft(state?.draft || initial(booking));
@@ -316,6 +503,224 @@ export default function OfferWorkspace({
     setPreview(null);
     setNotice("");
   }
+  // The route as rows: the start, every day, the end. Every service belongs to one row.
+  const [defaultMargin, setDefaultMargin] = useState(DEFAULT_MARGIN);
+  // The partner catalogue: who can do each service, where and at what price.
+  const [partnerServices, setPartnerServices] = useState<PartnerService[]>([]);
+  useEffect(() => {
+    api<{ services: PartnerService[] }>("/api/v1/operations/partners", auth)
+      .then((x) => setPartnerServices(x.services))
+      .catch(() => setPartnerServices([]));
+  }, [auth]);
+  /** Partners that can provide this service for this offer: same kind and currency, active, free on the date. */
+  const partnersFor = (line: OfferLine, row: number) => {
+    const date = b?.departure ? String(b.departure).slice(0, 10) : "";
+    const fits = partnerServices.filter(
+      (x) =>
+        x.service_key === baseOf(line.key) &&
+        x.currency === draft?.currency &&
+        x.active &&
+        x.partner_active &&
+        x.capacity > 0 &&
+        (!date || (String(x.available_from).slice(0, 10) <= date && String(x.available_to).slice(0, 10) >= date)),
+    );
+    const here = rowCity(row).toLowerCase();
+    return {
+      here: fits.filter((x) => x.location.toLowerCase().includes(here)),
+      other: fits.filter((x) => !x.location.toLowerCase().includes(here)),
+    };
+  };
+  /** Choosing a partner fills in who does it, where, the cost and the cancellation terms of the line. */
+  function choosePartner(line: OfferLine, service: PartnerService) {
+    patchLine(line.key, {
+      name: service.name,
+      supplier: service.partner_name,
+      location: service.location.slice(0, 100),
+      policy: service.policy,
+      ...priceLine(line, service.price_minor / 100, lineMargin(line)),
+    });
+  }
+  const dayCount = draft?.itinerary.length ?? 0;
+  const rowOf = (line: OfferLine) =>
+    Math.min(
+      Math.max(line.row ?? (baseOf(line.key).startsWith("transfer") ? 0 : 1), 0),
+      dayCount + 1,
+    );
+  const rowCity = (row: number) =>
+    !draft
+      ? ""
+      : row === 0
+        ? draft.startCity || "Baku"
+        : row === dayCount + 1
+          ? draft.endCity || "Baku"
+          : draft.itinerary[row - 1].city;
+  const dayOfRow = (row: number) => draft?.itinerary[row - 1]?.day ?? row;
+  const rowTitle = (row: number) => {
+    if (row === 0) return t("Start", "Старт", "Başlanğıc");
+    if (row === dayCount + 1) return t("End", "Конец", "Qayıdış");
+    const day = dayOfRow(row);
+    const nth = (draft?.itinerary.slice(0, row).filter((_, i) => dayOfRow(i + 1) === day).length ?? 1);
+    return t("Day", "День", "Gün") + " " + day + (nth > 1 ? t(`, place ${nth}`, `, место ${nth}`, `, ${nth}-ci yer`) : "");
+  };
+  /** Entries without a day number (older offers) get one each, so days can be added and removed. */
+  const withDays = (list: OfferDraft["itinerary"]) => list.map((e, i) => ({ ...e, day: e.day ?? i + 1 }));
+  function patchLine(key: string, patch: Partial<OfferLine>) {
+    if (!draft) return;
+    edit({
+      ...draft,
+      services: draft.services.map((x) => (x.key === key ? { ...x, ...patch } : x)),
+    });
+  }
+  /** A new cost (or margin) also moves the customer price, the same way the server works it out. */
+  function priceLine(line: OfferLine, cost: number, margin: number): Partial<OfferLine> {
+    // A price typed by hand stays; only the margin it implies moves with the cost.
+    if (line.fixedPrice != null)
+      return {
+        costPrice: cost,
+        fixedPrice: line.fixedPrice,
+        unitPrice: line.fixedPrice,
+        marginPercent: cost > 0 ? Math.round((line.fixedPrice / cost - 1) * 10000) / 100 : lineMargin(line),
+      };
+    return { costPrice: cost, marginPercent: margin, unitPrice: withMargin(cost, margin) };
+  }
+  /** The customer price per unit typed by the office (or cleared to go back to cost plus margin). */
+  function setCustomerPrice(line: OfferLine, price: number | null) {
+    const cost = lineCost(line);
+    if (price == null)
+      return patchLine(line.key, {
+        fixedPrice: null,
+        ...priceLine({ ...line, fixedPrice: null }, cost, defaultMargin),
+      });
+    patchLine(line.key, {
+      fixedPrice: price,
+      unitPrice: price,
+      marginPercent: cost > 0 ? Math.round((price / cost - 1) * 10000) / 100 : lineMargin(line),
+    });
+  }
+  function addLine(row: number, kind: string) {
+    if (!draft) return;
+    const same = draft.services.filter((x) => baseOf(x.key) === kind).length;
+    const pax = Number(JSON.parse(b?.quotePayload || "{}").input?.pax) || 2;
+    const inRow = draft.services.find((x) => rowOf(x) === row);
+    const margin = inRow ? lineMargin(inRow) : defaultMargin;
+    const city = row === 0 || row === dayCount + 1 ? "" : ", " + rowCity(row);
+    edit({
+      ...draft,
+      services: [
+        ...draft.services,
+        {
+          key: same ? kind + "-" + (same + 1) : kind,
+          name: (names[kind]?.[0] || kind) + city,
+          quantity: kind === "hotel" ? Math.ceil(pax / 2) : UNITS[kind] === "person" ? pax : 1,
+          nights: 1,
+          unitPrice: 0,
+          unit: UNITS[kind],
+          supplier: "",
+          location: "",
+          availability: "CONFIRMED",
+          policy: "",
+          internalNote: "",
+          row,
+          costPrice: 0,
+          marginPercent: margin,
+        },
+      ],
+    });
+  }
+  function removeLine(key: string) {
+    if (!draft) return;
+    edit({ ...draft, services: draft.services.filter((x) => x.key !== key) });
+  }
+  const MAX_DAYS = 14;
+  const MAX_PLACES_PER_DAY = 4;
+  const MAX_ENTRIES = 30;
+  /** A new day with one place at the end of the trip; the services of the end row move down with it. */
+  function addDay(city: string) {
+    if (!draft || draft.itinerary.length >= MAX_ENTRIES) return;
+    const list = withDays(draft.itinerary);
+    const lastDay = list.length ? (list[list.length - 1].day as number) : 0;
+    if (lastDay >= MAX_DAYS) return;
+    const end = dayCount + 1;
+    edit({
+      ...draft,
+      itinerary: [...list, { city, description: city, day: lastDay + 1 }],
+      services: draft.services.map((x) => {
+        const r = rowOf(x);
+        return { ...x, row: r === end ? end + 1 : r };
+      }),
+    });
+  }
+  /** Another place in the same day, right after the given row. */
+  function addPlace(afterRow: number, city: string) {
+    if (!draft || draft.itinerary.length >= MAX_ENTRIES) return;
+    const list = withDays(draft.itinerary);
+    const day = list[afterRow - 1].day as number;
+    if (list.filter((e) => e.day === day).length >= MAX_PLACES_PER_DAY) return;
+    edit({
+      ...draft,
+      itinerary: [...list.slice(0, afterRow), { city, description: city, day }, ...list.slice(afterRow)],
+      services: draft.services.map((x) => {
+        const r = rowOf(x);
+        return { ...x, row: r >= afterRow + 1 ? r + 1 : r };
+      }),
+    });
+  }
+  /** Removing a place also removes its services. If it was the only place of its day, the day goes too. */
+  function removeStop(row: number) {
+    if (!draft || dayCount < 1) return;
+    const lines = draft.services.filter((x) => rowOf(x) === row);
+    if (
+      lines.length &&
+      !window.confirm(
+        t(
+          `Remove this place and its ${lines.length} service(s)?`,
+          `Убрать это место и его услуги (${lines.length})?`,
+          `Bu yer və onun ${lines.length} xidməti silinsin?`,
+        ),
+      )
+    )
+      return;
+    const list = withDays(draft.itinerary);
+    const day = list[row - 1].day as number;
+    const dayGone = list.filter((e) => e.day === day).length === 1;
+    edit({
+      ...draft,
+      itinerary: list
+        .filter((_, i) => i !== row - 1)
+        .map((e) => ((e.day as number) > day && dayGone ? { ...e, day: (e.day as number) - 1 } : e)),
+      services: draft.services
+        .filter((x) => rowOf(x) !== row)
+        .map((x) => {
+          const r = rowOf(x);
+          return { ...x, row: r > row ? r - 1 : r };
+        }),
+    });
+  }
+  function setRowMargin(row: number, margin: number) {
+    if (!draft) return;
+    edit({
+      ...draft,
+      services: draft.services.map((x) =>
+        rowOf(x) === row ? { ...x, ...priceLine(x, lineCost(x), margin) } : x,
+      ),
+    });
+  }
+  function setAllMargins(margin: number) {
+    setDefaultMargin(margin);
+    if (!draft) return;
+    edit({
+      ...draft,
+      services: draft.services.map((x) => ({ ...x, ...priceLine(x, lineCost(x), margin) })),
+    });
+  }
+  const rowSums = (row: number) => {
+    const lines = draft?.services.filter((x) => rowOf(x) === row) ?? [];
+    return {
+      lines,
+      cost: lines.reduce((n, x) => n + lineCostAmount(x), 0),
+      price: lines.reduce((n, x) => n + lineAmount(x), 0),
+    };
+  };
   function close() {
     if (busy) return;
     modalRef.current?.close();
@@ -328,15 +733,33 @@ export default function OfferWorkspace({
     focusRef.current = document.activeElement as HTMLElement;
     setEditor({ ...line });
   }
-  type Step = "info" | "offer" | "preview" | "status";
-  const STEP_ORDER: Step[] = ["info", "offer", "preview", "status"];
+  type Step = "info" | "offer" | "preview" | "status" | "manage" | "pay" | "finance" | "docs";
+  const STEP_ORDER: Step[] = ["info", "offer", "preview", "status", "manage", "pay", "finance", "docs"];
   const sent = sentVersion > 0;
+  const accepted = !!contract && contract.state === "ACCEPTED" && contract.current_offer;
   const step: Step =
     route.view === "Bookings" && STEP_ORDER.includes(route.sub as Step)
       ? (route.sub as Step)
-      : sent
-        ? "status"
-        : "info";
+      : accepted
+        ? "manage"
+        : sent
+          ? "status"
+          : "info";
+  // The pages opened from the Booking hub still belong to the last step of the wizard.
+  const stepKey: Step = step === "pay" || step === "finance" || step === "docs" ? "manage" : step;
+  /** Reads the received amount again, for example after a payment was recorded on the page. */
+  async function refreshReceived() {
+    if (!selected) return;
+    try {
+      const p = await api<{ receivedMinor?: number; paidMinor: number }>(
+        "/api/v1/operations/bookings/" + selected + "/payment-context",
+        auth,
+      );
+      setReceivedMinor(p.receivedMinor ?? p.paidMinor);
+    } catch {
+      /* the page still shows the last known amount */
+    }
+  }
   const [historyOpen, setHistoryOpen] = useState(false);
   function goTo(next: Step) {
     if (!selected) return;
@@ -348,20 +771,14 @@ export default function OfferWorkspace({
         ...(count === 0
           ? [t("Add at least one service", "Добавьте хотя бы одну услугу", "Ən azı bir xidmət əlavə edin")]
           : []),
-        ...(checked !== count
-          ? [
-              t(
-                "Confirm the supplier and availability of every service",
-                "Подтвердите поставщика и доступность каждой услуги",
-                "Hər xidmətin təchizatçısını və mövcudluğunu təsdiqləyin",
-              ),
-            ]
-          : []),
         ...(!draft.message.trim()
           ? [t("Write a short message for the customer", "Напишите сообщение клиенту", "Müştəriyə qısa mesaj yazın")]
           : []),
-        ...(!draft.returnRoute.trim()
-          ? [t("Add the return route", "Укажите обратный маршрут", "Geri dönüş marşrutunu yazın")]
+        ...(draft.itinerary.length === 0
+          ? [t("Add at least one day", "Добавьте хотя бы один день", "Ən azı bir gün əlavə edin")]
+          : []),
+        ...(draft.services.some((x) => lineAmount(x) < 1)
+          ? [t("Enter a price for every service", "Укажите цену каждой услуги", "Hər xidmətə qiymət yazın")]
           : []),
         ...(pending
           ? [
@@ -405,13 +822,14 @@ export default function OfferWorkspace({
     if (!selected || loading || !draft || !b) return;
     if ((step === "offer" || step === "preview") && !canEdit && !sent) goTo("info");
     else if (step === "status" && !sent) goTo("info");
+    else if (stepKey === "manage" && !accepted) goTo(sent ? "status" : "info");
     else if (step === "preview") {
       if (!canEdit) goTo("status");
       else if (dirty || !draft.version) goTo("offer");
       else if (!preview || preview.draftVersion !== draft.version)
         void loadPreview();
     }
-  }, [step, loading, draft?.version, dirty, sentVersion, canEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, loading, draft?.version, dirty, sentVersion, canEdit, accepted]); // eslint-disable-line react-hooks/exhaustive-deps
   async function openHistory() {
     if (!b) return;
     setHistoryOpen((open) => !open);
@@ -426,6 +844,20 @@ export default function OfferWorkspace({
   }
   async function save() {
     if (!draft || !b) return null;
+    if (draft.itinerary.length === 0) {
+      setError(t("Add at least one day before saving.", "Добавьте хотя бы один день.", "Saxlamazdan əvvəl ən azı bir gün əlavə edin."));
+      return null;
+    }
+    if (draft.services.some((x) => lineAmount(x) < 1)) {
+      setError(
+        t(
+          "Enter a price for every service before saving.",
+          "Укажите цену каждой услуги перед сохранением.",
+          "Saxlamazdan əvvəl hər xidmətə qiymət yazın.",
+        ),
+      );
+      return null;
+    }
     setBusy(true);
     setError("");
     try {
@@ -451,9 +883,7 @@ export default function OfferWorkspace({
   const ready =
     !!draft &&
     count > 0 &&
-    checked === count &&
     !!draft.message.trim() &&
-    !!draft.returnRoute.trim() &&
     !pending &&
     !dirty &&
     previewVersion === draft.version &&
@@ -560,6 +990,14 @@ export default function OfferWorkspace({
     ru: "Русский",
     az: "Azərbaycanca",
   };
+  // Extras the customer asked for; they are not in the customer's estimate, so add them to the offer.
+  const extraNames: Record<string, string> = {
+    event: t("Event", "Мероприятие", "Tədbir"),
+    meals: t("Local meals", "Местная кухня", "Yerli yeməklər"),
+    tickets: t("Entrance tickets", "Входные билеты", "Giriş biletləri"),
+    photographer: t("Photographer", "Фотограф", "Fotoqraf"),
+  };
+  const extraKeys = Array.isArray(input.extras) ? (input.extras as string[]) : [];
   const stepsList: { key: Step; label: string; enabled: boolean }[] = [
     { key: "info", label: t("Request", "Заявка", "Sorğu"), enabled: true },
     { key: "offer", label: t("Offer", "Предложение", "Təklif"), enabled: canEdit },
@@ -569,8 +1007,13 @@ export default function OfferWorkspace({
       enabled: canEdit && count > 0,
     },
     { key: "status", label: t("Status", "Статус", "Status"), enabled: sent },
+    {
+      key: "manage",
+      label: t("Booking", "Бронирование", "Rezervasiya"),
+      enabled: accepted,
+    },
   ];
-  const stepIndex = STEP_ORDER.indexOf(step);
+  const stepIndex = STEP_ORDER.indexOf(stepKey);
   const pricedTotal = draft ? total : 0;
   const money = (n: number) => fmt(n);
   const costSummary = draft && (
@@ -580,7 +1023,10 @@ export default function OfferWorkspace({
         <p>
           {draft.title}
           <br />
-          {draft.itinerary.map((d) => d.city).join(" → ")}
+          {[rowCity(0), ...draft.itinerary.map((d) => d.city), rowCity(dayCount + 1)]
+            .filter((c, i, all) => c !== all[i - 1])
+            .map(cityLabel)
+            .join(" → ")}
         </p>
         {draft.services.map((line) => (
           <div className="ow-summary-line" key={line.key}>
@@ -598,6 +1044,377 @@ export default function OfferWorkspace({
             <strong>{money(receivedMinor / 100)}</strong>
           </div>
         )}
+      </div>
+    </aside>
+  );
+
+  /** The places of the trip grouped by day: each day is a folder holding its places. */
+  const dayGroups = (draft?.itinerary ?? []).reduce<{ day: number; rows: number[] }[]>((all, e, i) => {
+    const day = e.day ?? i + 1;
+    const last = all[all.length - 1];
+    if (last && last.day === day) last.rows.push(i + 1);
+    else all.push({ day, rows: [i + 1] });
+    return all;
+  }, []);
+  const renderCard = (row: number) => {
+    if (!draft) return null;
+    const sums = rowSums(row);
+                        const isDay = row > 0 && row <= dayCount;
+                        const margin = sums.lines.length ? lineMargin(sums.lines[0]) : defaultMargin;
+    return (
+                          <li className="ow-rowcard" key={row}>
+<details open>
+<summary>
+<b className="ow-num" aria-hidden="true">{row + 1}</b>
+<strong>{rowTitle(row)}</strong>
+<span>{cityLabel(rowCity(row))}</span>
+<small>{fmt(sums.price)}</small>
+</summary>
+<div className="ow-rowbody">
+                            <header>
+                              <div className="ow-rowhead">
+                                <small>{rowTitle(row)}</small>
+                                <select
+                                  aria-label={rowTitle(row)}
+                                  disabled={!canEdit || busy}
+                                  value={rowCity(row)}
+                                  onChange={(e) =>
+                                    edit(
+                                      row === 0
+                                        ? { ...draft, startCity: e.target.value }
+                                        : row === dayCount + 1
+                                          ? { ...draft, endCity: e.target.value }
+                                          : {
+                                              ...draft,
+                                              itinerary: draft.itinerary.map((d, n) =>
+                                                n === row - 1 ? { ...d, city: e.target.value } : d,
+                                              ),
+                                            },
+                                    )
+                                  }
+                                >
+                                  {CITIES.map((c) => (
+                                    <option key={c} value={c}>
+                                      {cityLabel(c)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <label className="ow-rowmargin">
+                                {t("Margin, %", "Маржа, %", "Marja, %")}
+                                <NumField
+                                  label={t("Margin of ", "Маржа: ", "Marja: ") + rowTitle(row)}
+                                  value={margin}
+                                  min={0}
+                                  max={300}
+                                  step={0.5}
+                                  disabled={!canEdit || busy || !sums.lines.length}
+                                  onCommit={(m) => setRowMargin(row, m)}
+                                />
+                              </label>
+                              <div className="ow-rowsum">
+                                <small>{t("Cost", "Себестоимость", "Maliyyət")}</small>
+                                <strong>{fmt(sums.cost)}</strong>
+                                <small>{t("Customer", "Клиент", "Müştəri")}</small>
+                                <strong>{fmt(sums.price)}</strong>
+                              </div>
+                              {isDay && (
+                                <button
+                                  type="button"
+                                  className="ow-icon"
+                                  aria-label={t("Remove this place: ", "Убрать место: ", "Bu yeri sil: ") + rowTitle(row)}
+                                  title={t("Remove this place", "Убрать место", "Bu yeri sil")}
+                                  disabled={!canEdit || busy}
+                                  onClick={() => removeStop(row)}
+                                >
+                                  <X size={16} />
+                                </button>
+                              )}
+                            </header>
+                            {isDay && (
+                              <label className="ow-daylabel">
+                                <span>
+                                  {t("Description for the customer", "Описание для клиента", "Müştəri üçün təsvir")}
+                                  <small>
+                                    {t(
+                                      "Shown in the offer: what happens in this place.",
+                                      "Показывается в предложении: что будет в этом месте.",
+                                      "Təklifdə göstərilir: bu yerdə nə olacaq.",
+                                    )}
+                                  </small>
+                                </span>
+                                <textarea
+                                  className="ow-daytext"
+                                  aria-label={t("Description of ", "Описание: ", "Təsvir: ") + rowTitle(row)}
+                                  maxLength={1500}
+                                  rows={2}
+                                  placeholder={t(
+                                    "For example: walk through the old town, lunch at a family home…",
+                                    "Например: прогулка по старому городу, обед в семейном доме…",
+                                    "Məsələn: köhnə şəhərdə gəzinti, ailə evində nahar…",
+                                  )}
+                                  disabled={!canEdit || busy}
+                                  value={draft.itinerary[row - 1].description}
+                                  onChange={(e) =>
+                                    edit({
+                                      ...draft,
+                                      itinerary: draft.itinerary.map((d, n) =>
+                                        n === row - 1 ? { ...d, description: e.target.value } : d,
+                                      ),
+                                    })
+                                  }
+                                />
+                              </label>
+                            )}
+                            <ul className="ow-lines">
+                              {sums.lines.map((line) => {
+                                const Icon = icons[baseOf(line.key)] || FileText;
+                                return (
+                                  <li className="ow-line" key={line.key}>
+                                    <div className="ow-line-name">
+                                      <Icon size={18} aria-hidden="true" />
+                                      <div>
+                                        <strong>{line.name || label(line.key)}</strong>
+                                        {line.supplier && <small>{line.supplier}</small>}
+                                      </div>
+                                    </div>
+                                    <label>
+                                      {t("Qty", "Кол-во", "Say")}
+                                      <NumField
+                                        label={t("Quantity of ", "Количество: ", "Say: ") + line.name}
+                                        value={line.quantity}
+                                        min={1}
+                                        max={168}
+                                        step={1}
+                                        disabled={!canEdit || busy}
+                                        onCommit={(n) =>
+                                          patchLine(line.key, {
+                                            quantity: Math.max(1, Math.round(n)),
+                                            availability: "CONFIRMED",
+                                          })
+                                        }
+                                      />
+                                    </label>
+                                    {baseOf(line.key) === "hotel" && (
+                                      <label>
+                                        {t("Nights", "Ночей", "Gecə")}
+                                        <NumField
+                                          label={t("Nights of ", "Ночей: ", "Gecə: ") + line.name}
+                                          value={line.nights}
+                                          min={1}
+                                          max={14}
+                                          step={1}
+                                          disabled={!canEdit || busy}
+                                          onCommit={(n) =>
+                                            patchLine(line.key, {
+                                              nights: Math.max(1, Math.round(n)),
+                                              availability: "CONFIRMED",
+                                            })
+                                          }
+                                        />
+                                      </label>
+                                    )}
+                                    <label>
+                                      {t("Cost per unit", "Себестоимость за ед.", "Vahid maliyyəti")}
+                                      <NumField
+                                        label={t("Cost of ", "Себестоимость: ", "Maliyyət: ") + line.name}
+                                        value={lineCost(line)}
+                                        min={0}
+                                        max={100000}
+                                        step={0.01}
+                                        disabled={!canEdit || busy}
+                                        onCommit={(n) =>
+                                          patchLine(line.key, priceLine(line, n, lineMargin(line)))
+                                        }
+                                      />
+                                      {(() => {
+                                        const { here, other } = partnersFor(line, row);
+                                        const chosen = [...here, ...other].find(
+                                          (x) => x.partner_name === line.supplier && x.name === line.name,
+                                        );
+                                        if (!chosen) return null;
+                                        const listed = chosen.price_minor / 100;
+                                        return (
+                                          <small className="ow-listed">
+                                            {t("Partner price", "Цена партнёра", "Partnyor qiyməti")}: {listed.toFixed(2)}
+                                            {Math.abs(listed - lineCost(line)) > 0.004
+                                              ? ", " + t("changed", "изменена", "dəyişdirilib")
+                                              : ""}
+                                          </small>
+                                        );
+                                      })()}
+                                    </label>
+                                    <label className="ow-line-custprice">
+                                      {t("Customer price per unit", "Цена клиенту за ед.", "Müştəri qiyməti (vahid)")}
+                                      <span>
+                                        <NumField
+                                          label={t("Customer price of ", "Цена клиенту: ", "Müştəri qiyməti: ") + line.name}
+                                          value={line.unitPrice}
+                                          min={0}
+                                          max={100000}
+                                          step={0.01}
+                                          disabled={!canEdit || busy}
+                                          onCommit={(n) => setCustomerPrice(line, n)}
+                                        />
+                                        {line.fixedPrice != null && (
+                                          <button
+                                            type="button"
+                                            className="ow-icon"
+                                            title={t("Back to cost plus margin", "Вернуть себестоимость плюс маржа", "Maliyyət və marja ilə hesablanmağa qayıt")}
+                                            aria-label={t("Reset the price of ", "Сбросить цену: ", "Qiyməti sıfırla: ") + line.name}
+                                            disabled={!canEdit || busy}
+                                            onClick={() => setCustomerPrice(line, null)}
+                                          >
+                                            <RotateCcw size={14} />
+                                          </button>
+                                        )}
+                                      </span>
+                                    </label>
+                                    <div className="ow-line-price">
+                                      <small>{t("Customer pays", "Клиент платит", "Müştəri ödəyir")}</small>
+                                      <strong>{fmt(lineAmount(line))}</strong>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="ow-icon"
+                                      aria-label={t("Details of ", "Детали: ", "Detallar: ") + line.name}
+                                      disabled={!canEdit || busy}
+                                      onClick={() => openLine(line)}
+                                    >
+                                      <Pencil size={15} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="ow-icon"
+                                      aria-label={t("Remove ", "Убрать ", "Sil ") + line.name}
+                                      disabled={!canEdit || busy}
+                                      onClick={() => removeLine(line.key)}
+                                    >
+                                      <X size={16} />
+                                    </button>
+                                    {(() => {
+                                      const { here, other } = partnersFor(line, row);
+                                      const chosen = [...here, ...other].find(
+                                        (x) => x.partner_name === line.supplier && x.name === line.name,
+                                      );
+                                      const option = (x: PartnerService) => (
+                                        <option key={x.id} value={x.id}>
+                                          {x.partner_name}, {x.name}, {(x.price_minor / 100).toFixed(2)} {x.currency}
+                                        </option>
+                                      );
+                                      return (
+                                        <label className="ow-line-partner">
+                                          {t("Partner who provides it", "Партнёр-исполнитель", "Xidməti edəcək partnyor")}
+                                          <select
+                                            aria-label={t("Partner for ", "Партнёр: ", "Partnyor: ") + line.name}
+                                            disabled={!canEdit || busy}
+                                            value={chosen?.id ?? ""}
+                                            onChange={(e) => {
+                                              const x = [...here, ...other].find((y) => y.id === e.target.value);
+                                              if (x) choosePartner(line, x);
+                                            }}
+                                          >
+                                            <option value="">
+                                              {line.supplier && !chosen
+                                                ? line.supplier + t(" (typed by hand)", " (вручную)", " (əl ilə yazılıb)")
+                                                : here.length + other.length
+                                                  ? t("Choose a partner…", "Выберите партнёра…", "Partnyor seçin…")
+                                                  : t("No partner in the catalogue for this service", "В каталоге нет партнёра для этой услуги", "Bu xidmət üçün kataloqda partnyor yoxdur")}
+                                            </option>
+                                            {here.length > 0 && (
+                                              <optgroup label={t("In ", "В: ", "Bu yerdə: ") + cityLabel(rowCity(row))}>
+                                                {here.map(option)}
+                                              </optgroup>
+                                            )}
+                                            {other.length > 0 && (
+                                              <optgroup label={t("Other places", "Другие места", "Digər yerlər")}>
+                                                {other.map(option)}
+                                              </optgroup>
+                                            )}
+                                          </select>
+                                        </label>
+                                      );
+                                    })()}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                            <select
+                              className="ow-add"
+                              aria-label={t("Add a service to ", "Добавить услугу: ", "Xidmət əlavə et: ") + rowTitle(row)}
+                              disabled={!canEdit || busy}
+                              value=""
+                              onChange={(e) => {
+                                if (e.target.value) addLine(row, e.target.value);
+                              }}
+                            >
+                              <option value="">
+                                {"+ " + t("Add a service", "Добавить услугу", "Xidmət əlavə et")}
+                              </option>
+                              {KINDS.map((k) => (
+                                <option key={k} value={k}>
+                                  {label(k)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+</details>
+</li>
+    );
+  };
+
+  // What only the office sees: the cost of every row, the margin and the customer price.
+  const internalSummary = draft && (
+    <aside className="ow-summary ow-internal">
+      <div>
+        <h2>
+          <Lock size={14} aria-hidden="true" />
+          {t("Office only", "Только для офиса", "Yalnız ofis")}
+        </h2>
+        <p className="ow-sub">
+          {t(
+            "The customer never sees costs or margin.",
+            "Клиент не видит себестоимость и маржу.",
+            "Müştəri maliyyəti və marjanı görmür.",
+          )}
+        </p>
+        {Array.from({ length: dayCount + 2 }, (_, row) => {
+          const sums = rowSums(row);
+          if (!sums.lines.length) return null;
+          return (
+            <div className="ow-internal-row" key={row}>
+              <span>
+                {rowTitle(row)}, {cityLabel(rowCity(row))}
+              </span>
+              <small>
+                {fmt(sums.cost)} → {fmt(sums.price)}
+              </small>
+            </div>
+          );
+        })}
+        {(() => {
+          const cost = draft.services.reduce((n, x) => n + lineCostAmount(x), 0);
+          const margin = total - cost;
+          return (
+            <>
+              <div className="ow-summary-line">
+                <span>{t("Total cost", "Себестоимость", "Ümumi maliyyət")}</span>
+                <strong>{fmt(cost)}</strong>
+              </div>
+              <div className="ow-summary-line">
+                <span>
+                  {t("Margin", "Маржа", "Marja")}
+                  {cost > 0 ? `, ${Math.round((margin / cost) * 1000) / 10}%` : ""}
+                </span>
+                <strong>{fmt(margin)}</strong>
+              </div>
+              <div className="ow-summary-line ow-total">
+                <strong>{t("Customer total", "Итого клиенту", "Müştəri üçün cəm")}</strong>
+                <strong>{fmt(total)}</strong>
+              </div>
+            </>
+          );
+        })()}
       </div>
     </aside>
   );
@@ -633,7 +1450,7 @@ export default function OfferWorkspace({
             <p key={i}>
               <small>{formatDateTime(x.created_at)}</small>
               <br />
-              {x.action} · {x.actor}
+              {x.action}, {x.actor}
             </p>
           ))}
         </aside>
@@ -702,9 +1519,21 @@ export default function OfferWorkspace({
                 {customer?.name ||
                   t("Custom journey", "Индивидуальный маршрут", "Fərdi səfər")}
               </h1>
-              <p>
-                #{b.id.slice(0, 8)} · {formatDay(b.departure)}
-                {customer?.email ? " · " + customer.email : ""}
+              <p className="ow-meta">
+                <span>#{b.id.slice(0, 8)}</span>
+                <span>{formatDay(b.departure)}</span>
+                {customer?.email && (
+                  <span>
+                    <Mail size={15} aria-hidden="true" />
+                    {customer.email}
+                  </span>
+                )}
+                {customer?.phone && (
+                  <span>
+                    <Phone size={15} aria-hidden="true" />
+                    {customer.phone}
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -713,14 +1542,14 @@ export default function OfferWorkspace({
               <li
                 key={x.key}
                 className={
-                  (step === x.key ? "current " : "") +
+                  (stepKey === x.key ? "current " : "") +
                   (i < stepIndex ? "done " : "") +
                   (x.enabled ? "" : "off")
                 }
               >
                 <button
                   disabled={!x.enabled || busy}
-                  aria-current={step === x.key ? "step" : undefined}
+                  aria-current={stepKey === x.key ? "step" : undefined}
                   onClick={() =>
                     x.key === "preview" && step !== "preview"
                       ? void toPreview()
@@ -761,7 +1590,20 @@ export default function OfferWorkspace({
                 <div>
                   <small>{t("Customer", "Клиент", "Müştəri")}</small>
                   <strong>{customer?.name || "—"}</strong>
-                  <small>{customer?.email || "—"}</small>
+                  <div className="ow-contact">
+                    <span>
+                      <Mail size={14} aria-hidden="true" />
+                      {customer?.email || "—"}
+                    </span>
+                    <span>
+                      <Phone size={14} aria-hidden="true" />
+                      {customer?.phone ? (
+                        <a href={"tel:" + customer.phone}>{customer.phone}</a>
+                      ) : (
+                        t("No phone number", "Телефон не указан", "Telefon göstərilməyib")
+                      )}
+                    </span>
+                  </div>
                 </div>
                 <div>
                   <small>{t("Travel dates", "Даты", "Səfər tarixi")}</small>
@@ -769,7 +1611,7 @@ export default function OfferWorkspace({
                 </div>
                 <div>
                   <small>{t("Travelers", "Участники", "Səyahətçilər")}</small>
-                  <strong>{String(input.pax ?? "—")}</strong>
+                  <strong>{paxRange(Number(input.pax))}</strong>
                 </div>
                 <div>
                   <small>{t("Language", "Язык", "Dil")}</small>
@@ -779,33 +1621,159 @@ export default function OfferWorkspace({
               <div className="ow-info-grid">
                 <section>
                   <h2>{t("Requested route", "Запрошенный маршрут", "İstənilən marşrut")}</h2>
-                  <div className="ow-route-days">
-                    {initial(b).itinerary.map((day, i) => (
-                      <div className="ow-day" key={i}>
-                        <strong>
-                          {t("Day", "День", "Gün")} {i + 1}
-                        </strong>
-                        <span>{day.city}</span>
+                  {(() => {
+                    const names: Record<string, [string, string, string]> = {
+                      Baku: ["Baku", "Баку", "Bakı"],
+                      Quba: ["Quba", "Куба", "Quba"],
+                      Khinalug: ["Khinalug", "Хыналыг", "Xınalıq"],
+                      Gabala: ["Gabala", "Габала", "Qəbələ"],
+                      Sheki: ["Sheki", "Шеки", "Şəki"],
+                    };
+                    const name = (city: string) =>
+                      names[city] ? t(...names[city]) : city;
+                    // Day by day when the customer built the trip that way (places and what they want in each);
+                    // older requests have one city per day.
+                    const plan = Array.isArray(input.plan)
+                      ? (input.plan as { places: { city: string; services: string[] }[] }[])
+                      : null;
+                    const entries = plan
+                      ? plan.flatMap((d, di) =>
+                          d.places.map((p, pi) => ({ city: p.city, day: di + 1, nth: pi + 1, services: p.services })),
+                        )
+                      : (() => {
+                          const cities = initial(b).itinerary.map((day) => day.city);
+                          const groups = cities.reduce<{ city: string; from: number; to: number }[]>(
+                            (all, city, i) => {
+                              const last = all[all.length - 1];
+                              if (last && last.city === city) last.to = i + 1;
+                              else all.push({ city, from: i + 1, to: i + 1 });
+                              return all;
+                            },
+                            [],
+                          );
+                          return groups.map((g) => ({
+                            city: g.city,
+                            day: g.from,
+                            to: g.to,
+                            nth: 1,
+                            services: [] as string[],
+                          }));
+                        })();
+                    // Start and end come from the request; older requests have none and left from Baku.
+                    const startCity = String(input.startCity ?? "Baku"),
+                      endCity = String(input.endCity ?? "Baku");
+                    const showStart = entries.length > 0,
+                      showReturn = entries.length > 0;
+                    const full = [
+                      ...(showStart ? [{ city: startCity, days: 0 }] : []),
+                      ...entries.map((e) => ({ city: e.city, days: 1 })),
+                      ...(showReturn ? [{ city: endCity, days: 0 }] : []),
+                    ];
+                    return (
+                      <div className="ow-route-card">
+                        <ol className="ow-stop-list">
+                          {showStart && (
+                            <li className="ow-fixed">
+                              <b aria-hidden="true">1</b>
+                              <div>
+                                <strong>{name(startCity)}</strong>
+                                <small>{t("Start", "Старт", "Başlanğıc")}</small>
+                              </div>
+                            </li>
+                          )}
+                          {entries.map((e, i) => (
+                            <li key={i}>
+                              <b aria-hidden="true">{i + 1 + (showStart ? 1 : 0)}</b>
+                              <div>
+                                <strong>{name(e.city)}</strong>
+                                <small>
+                                  {"to" in e && e.to !== e.day
+                                    ? `${t("Days", "Дни", "Günlər")} ${e.day}–${e.to}`
+                                    : `${t("Day", "День", "Gün")} ${e.day}` +
+                                      (e.nth > 1 ? t(`, place ${e.nth}`, `, место ${e.nth}`, `, ${e.nth}-ci yer`) : "")}
+                                </small>
+                                {e.services.length > 0 && (
+                                  <small className="ow-stop-services">
+                                    {e.services.map((k) => label(k)).join(", ")}
+                                  </small>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                          {showReturn && (
+                            <li className="ow-fixed">
+                              <b aria-hidden="true">{entries.length + 1 + (showStart ? 1 : 0)}</b>
+                              <div>
+                                <strong>{name(endCity)}</strong>
+                                <small>{t("Return", "Возвращение", "Qayıdış")}</small>
+                              </div>
+                            </li>
+                          )}
+                        </ol>
+                        <RouteMap
+                          stops={full}
+                          name={name}
+                          label={
+                            t("Route: ", "Маршрут: ", "Marşrut: ") +
+                            full.map((s) => name(s.city)).join(" → ")
+                          }
+                        />
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()}
                 </section>
                 <section>
                   <h2>{t("Customer's choices", "Выбор клиента", "Müştərinin seçimləri")}</h2>
                   <ul className="ow-choices">
-                    {quoted.lines.map((line) => (
-                      <li key={line.label}>
-                        <span>{label(line.label)}</span>
-                        {line.label === "hotel" && input.hotel ? (
-                          <small>{hotelNames[String(input.hotel)] ?? String(input.hotel)}</small>
-                        ) : line.label === "guide" && input.guideLanguage ? (
-                          <small>
-                            {langNames[String(input.guideLanguage)] ?? String(input.guideLanguage)}
-                          </small>
-                        ) : null}
+                    {[
+                      ...["transport", "hotel", "guide", "transfer", "intercity", "activity"].map(
+                        (code) => ({
+                          key: code,
+                          name: label(code),
+                          on:
+                            code === "intercity"
+                              ? Array.isArray(input.plan) &&
+                                (input.plan as { places: { services: string[] }[] }[]).some((d) =>
+                                  d.places.some((pl) => pl.services.includes("intercity")),
+                                )
+                              : quoted.lines.some((line) => line.label === code),
+                          note:
+                            code === "hotel" && input.hotel
+                              ? (hotelNames[String(input.hotel)] ?? String(input.hotel))
+                              : code === "guide" && input.guideLanguage
+                                ? (langNames[String(input.guideLanguage)] ??
+                                  String(input.guideLanguage))
+                                : "",
+                        }),
+                      ),
+                      ...Object.keys(extraNames).map((code) => ({
+                        key: code,
+                        name: extraNames[code],
+                        on: extraKeys.includes(code),
+                        note: extraKeys.includes(code)
+                          ? t(
+                              "Not in the estimate",
+                              "Не в расчёте",
+                              "Təxmini hesabda yoxdur",
+                            )
+                          : "",
+                      })),
+                    ]
+                      // Chosen services first, then the ones not chosen; each group keeps its order.
+                      .sort((x, y) => Number(y.on) - Number(x.on))
+                      .map((row) => (
+                      <li key={row.key} className={row.on ? "ow-choice on" : "ow-choice off"}>
+                        <span
+                          className="ow-mark"
+                          role="img"
+                          aria-label={row.on ? t("Chosen", "Выбрано", "Seçilib") : t("Not chosen", "Не выбрано", "Seçilməyib")}
+                        >
+                          {row.on ? <Check size={14} strokeWidth={3} /> : <X size={14} strokeWidth={3} />}
+                        </span>
+                        <span className="ow-choice-name">{row.name}</span>
+                        {row.note && <small>{row.note}</small>}
                       </li>
                     ))}
-                    {quoted.lines.length === 0 && <li>—</li>}
                   </ul>
                   <p className="ow-sub">
                     {t(
@@ -861,10 +1829,10 @@ export default function OfferWorkspace({
             <div className="ow-step-body">
               <div className="ow-grid">
                 <div>
-                  <section>
-                    <h2>{t("Offer details", "Детали предложения", "Təklif detalları")}</h2>
-                    <div className="ow-fields">
-                      <label>
+                  <section className="ow-routeplan">
+                    <h2>{t("Final itinerary and services", "Итоговый маршрут и услуги", "Yekun marşrut və xidmətlər")}</h2>
+                    <div className="ow-toolbar">
+                      <label className="ow-grow">
                         {t("Offer title", "Название", "Təklif başlığı")}
                         <input
                           maxLength={160}
@@ -875,126 +1843,102 @@ export default function OfferWorkspace({
                       </label>
                       <label>
                         {t("Currency", "Валюта", "Valyuta")}
-                        <input readOnly value={draft.currency} />
+                        <span className="ow-chip">{draft.currency}</span>
+                      </label>
+                      <label>
+                        {t("Default margin, %", "Маржа по умолчанию, %", "Standart marja, %")}
+                        <NumField
+                          label={t("Default margin", "Маржа по умолчанию", "Standart marja")}
+                          value={defaultMargin}
+                          min={0}
+                          max={300}
+                          step={0.5}
+                          disabled={!canEdit || busy}
+                          onCommit={setAllMargins}
+                        />
                       </label>
                     </div>
-                  </section>
-                  <section>
-                    <h2>{t("Final itinerary", "Итоговый маршрут", "Yekun marşrut")}</h2>
-                    <div>
-                      {draft.itinerary.map((day, i) => (
-                        <div className="ow-day" key={i}>
-                          <strong>
-                            {t("Day", "День", "Gün")} {i + 1}
-                          </strong>
-                          <select
-                            aria-label={t("Destination day ", "Направление дня ", "Günün istiqaməti ") + (i + 1)}
-                            disabled={!canEdit || busy}
-                            value={day.city}
-                            onChange={(e) =>
-                              edit({
-                                ...draft,
-                                itinerary: draft.itinerary.map((d, n) =>
-                                  n === i ? { ...d, city: e.target.value } : d,
-                                ),
-                              })
-                            }
-                          >
-                            {["Baku", "Quba", "Khinalug", "Gabala", "Sheki"].map((c) => (
-                              <option key={c}>{c}</option>
-                            ))}
-                          </select>
-                          <textarea
-                            aria-label={t("Day description ", "Описание дня ", "Günün təsviri ") + (i + 1)}
-                            maxLength={1500}
-                            disabled={!canEdit || busy}
-                            value={day.description}
-                            onChange={(e) =>
-                              edit({
-                                ...draft,
-                                itinerary: draft.itinerary.map((d, n) =>
-                                  n === i ? { ...d, description: e.target.value } : d,
-                                ),
-                              })
-                            }
-                          />
-                        </div>
+                    {(() => {
+                      const extras = Array.isArray(input.extras) ? (input.extras as string[]) : [];
+                      return extras.length ? (
+                        <p className="ow-sub">
+                          {t("The customer also asked for:", "Клиент также просит:", "Müştəri bunları da istəyib:")}{" "}
+                          {extras.map((k) => label(k)).join(", ")}
+                        </p>
+                      ) : null;
+                    })()}
+                    <ol className="ow-rows">
+                      {renderCard(0)}
+                      {dayGroups.map((g) => (
+                        <li className="ow-daygroup" key={g.day}>
+                          <details open>
+                            <summary>
+                              <strong>{t("Day", "День", "Gün")} {g.day}</strong>
+                              <span>{g.rows.map((r) => cityLabel(rowCity(r))).join(", ")}</span>
+                              <small>{fmt(g.rows.reduce((n, r) => n + rowSums(r).price, 0))}</small>
+                            </summary>
+                            <ol className="ow-rows ow-nested">
+                              {g.rows.map((r) => renderCard(r))}
+                              <li className="ow-addstop ow-addplace">
+                                <select
+                                  aria-label={t("Add a place to day ", "Добавить место в день ", "Günə yer əlavə et: ") + g.day}
+                                  disabled={
+                                    !canEdit ||
+                                    busy ||
+                                    draft.itinerary.length >= MAX_ENTRIES ||
+                                    g.rows.length >= MAX_PLACES_PER_DAY
+                                  }
+                                  value=""
+                                  onChange={(e) => {
+                                    if (e.target.value) addPlace(g.rows[g.rows.length - 1], e.target.value);
+                                  }}
+                                >
+                                  <option value="">
+                                    {"+ " + t("Another place this day", "Ещё место в этот день", "Bu günə başqa yer")}
+                                  </option>
+                                  {CITIES.map((c) => (
+                                    <option key={c} value={c}>
+                                      {cityLabel(c)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </li>
+                            </ol>
+                          </details>
+                        </li>
                       ))}
-                    </div>
-                    <label>
-                      {t("Return route", "Обратный маршрут", "Geri dönüş marşrutu")}
-                      <input
-                        maxLength={1500}
-                        disabled={!canEdit || busy}
-                        value={draft.returnRoute}
-                        onChange={(e) => edit({ ...draft, returnRoute: e.target.value })}
-                      />
-                    </label>
-                  </section>
-                  <section>
-                    <h2>{t("Services & customer prices", "Услуги и цены", "Xidmətlər və müştəri qiymətləri")}</h2>
-                    <div className="ow-table-scroll">
-                      <table>
-                        <thead>
-                          <tr>
-                            {[
-                              t("Service", "Услуга", "Xidmət"),
-                              t("Quantity", "Количество", "Say"),
-                              t("Total", "Сумма", "Cəm"),
-                              t("Availability", "Наличие", "Mövcudluq"),
-                              "",
-                            ].map((x, i) => (
-                              <th key={i}>{x}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {draft.services.map((line) => {
-                            const Icon = icons[line.key] || FileText;
-                            return (
-                              <tr key={line.key}>
-                                <td>
-                                  <div className="ow-service-name">
-                                    <Icon size={21} />
-                                    <strong>{line.name || label(line.key)}</strong>
-                                  </div>
-                                </td>
-                                <td>
-                                  {line.quantity}
-                                  {line.key === "hotel" ? " × " + line.nights : ""} × {fmt(line.unitPrice)}
-                                </td>
-                                <td>
-                                  <strong>{fmt(lineAmount(line))}</strong>
-                                </td>
-                                <td>
-                                  <span className={line.availability === "CONFIRMED" ? "ow-good" : ""}>
-                                    {line.availability === "CONFIRMED" ? <Check size={14} /> : <Clock size={14} />}{" "}
-                                    {availability(line.availability)}
-                                  </span>
-                                </td>
-                                <td>
-                                  <button
-                                    className="ow-link"
-                                    disabled={!canEdit || busy}
-                                    onClick={() => openLine(line)}
-                                  >
-                                    {t("Edit", "Изменить", "Dəyiş")}
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                        <tfoot>
-                          <tr>
-                            <th colSpan={3}>{t("Group total", "Итого для группы", "Qrup üçün cəm")}</th>
-                            <td colSpan={2}>
-                              <strong>{fmt(total)}</strong>
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
+                      <li className="ow-addstop">
+                        <select
+                          aria-label={t("Add a day", "Добавить день", "Gün əlavə et")}
+                          disabled={
+                            !canEdit ||
+                            busy ||
+                            draft.itinerary.length >= MAX_ENTRIES ||
+                            (dayCount > 0 && dayOfRow(dayCount) >= MAX_DAYS)
+                          }
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value) addDay(e.target.value);
+                          }}
+                        >
+                          <option value="">{"+ " + t("Add a day", "Добавить день", "Gün əlavə et")}</option>
+                          {CITIES.map((c) => (
+                            <option key={c} value={c}>
+                              {cityLabel(c)}
+                            </option>
+                          ))}
+                        </select>
+                      </li>
+                      {renderCard(dayCount + 1)}
+                    </ol>
+                    <p className="ow-sub">
+                      {t(
+                        "Group total",
+                        "Итого для группы",
+                        "Qrup üçün cəm",
+                      )}
+                      : <strong>{fmt(total)}</strong>
+                    </p>
                   </section>
                   <section>
                     <h2>{t("Message to customer", "Сообщение клиенту", "Müştəriyə mesaj")}</h2>
@@ -1019,7 +1963,10 @@ export default function OfferWorkspace({
                     />
                   </details>
                 </div>
-                {costSummary}
+                <div className="ow-side">
+                  {costSummary}
+                  {internalSummary}
+                </div>
               </div>
               <footer className="ow-footer">
                 <span>
@@ -1074,26 +2021,72 @@ export default function OfferWorkspace({
                     </p>
                     <h2>{preview.title}</h2>
                     <p>
-                      {customer?.name} · {formatDay(preview.date)} · {preview.travelers} {t("travelers", "чел.", "nəfər")}
+                      {customer?.name}, {formatDay(preview.date)}, {paxRange(preview.travelers)} {t("travelers", "чел.", "nəfər")}
                     </p>
-                    {preview.itinerary.map((d, i) => (
-                      <div className="ow-day" key={i}>
-                        <strong>
-                          {i + 1}. {d.city}
-                        </strong>
-                        <p>{d.description}</p>
-                      </div>
-                    ))}
-                    <p>{preview.returnRoute}</p>
-                    {preview.services.map((line) => (
-                      <section className="ow-preview-service" key={line.key}>
-                        <div className="ow-summary-line">
-                          <strong>{line.name}</strong>
-                          <strong>{fmt(line.total)}</strong>
-                        </div>
-                        <p>{line.policy}</p>
-                      </section>
-                    ))}
+                    {(() => {
+                      // What the customer sees: the start, every day with its places, the end, and under each
+                      // place the services (with their price) that belong to it.
+                      const count = preview.itinerary.length;
+                      const rowOfLine = (line: PublicOffer["services"][number]) =>
+                        Math.min(
+                          Math.max(line.row ?? (baseOf(line.key).startsWith("transfer") ? 0 : 1), 0),
+                          count + 1,
+                        );
+                      const linesAt = (row: number) =>
+                        preview.services.filter((line) => rowOfLine(line) === row);
+                      const days: { day: number; rows: number[] }[] = [];
+                      preview.itinerary.forEach((d, i) => {
+                        const day = d.day ?? i + 1;
+                        const last = days[days.length - 1];
+                        if (last && last.day === day) last.rows.push(i + 1);
+                        else days.push({ day, rows: [i + 1] });
+                      });
+                      const services = (row: number) =>
+                        linesAt(row).map((line) => (
+                          <div className="ow-preview-line" key={line.key}>
+                            <div className="ow-summary-line">
+                              <span>{line.name}</span>
+                              <strong>{fmt(line.total)}</strong>
+                            </div>
+                            {line.policy && <small>{line.policy}</small>}
+                          </div>
+                        ));
+                      return (
+                        <ol className="ow-timeline">
+                          <li className="ow-timeline-end">
+                            <strong>
+                              {t("Start", "Старт", "Başlanğıc")}, {cityLabel(preview.startCity || "Baku")}
+                            </strong>
+                            {services(0)}
+                          </li>
+                          {days.map((g) => (
+                            <li className="ow-timeline-day" key={g.day}>
+                              <strong>
+                                {t("Day", "День", "Gün")} {g.day}
+                              </strong>
+                              {g.rows.map((row) => {
+                                const d = preview.itinerary[row - 1];
+                                return (
+                                  <div className="ow-timeline-place" key={row}>
+                                    <b>{cityLabel(d.city)}</b>
+                                    {d.description.trim() && d.description.trim().toLowerCase() !== d.city.toLowerCase() && (
+                                      <p>{d.description}</p>
+                                    )}
+                                    {services(row)}
+                                  </div>
+                                );
+                              })}
+                            </li>
+                          ))}
+                          <li className="ow-timeline-end">
+                            <strong>
+                              {t("End", "Конец", "Qayıdış")}, {cityLabel(preview.endCity || "Baku")}
+                            </strong>
+                            {services(count + 1)}
+                          </li>
+                        </ol>
+                      );
+                    })()}
                     <div className="ow-summary-line ow-total">
                       <strong>{t("Group total", "Сумма для группы", "Qrup üçün cəm")}</strong>
                       <strong>{fmt(preview.total)}</strong>
@@ -1111,13 +2104,10 @@ export default function OfferWorkspace({
                     <div>
                       <h2>{t("Ready to send", "Готово к отправке", "Göndərməyə hazırdır")}</h2>
                       <p className="ow-good">
-                        <Check size={15} /> {t("Services confirmed", "Услуги подтверждены", "Xidmətlər təsdiqlənib")}
+                        <Check size={15} /> {t("Every service has a price", "У каждой услуги есть цена", "Hər xidmətin qiyməti var")}
                       </p>
                       <p className="ow-good">
                         <Check size={15} /> {t("Message written", "Сообщение написано", "Mesaj yazılıb")}
-                      </p>
-                      <p className="ow-good">
-                        <Check size={15} /> {t("Return route set", "Обратный маршрут указан", "Geri dönüş marşrutu var")}
                       </p>
                       <div className="ow-sage">
                         {t(
@@ -1158,43 +2148,217 @@ export default function OfferWorkspace({
 
           {step === "status" && sent && (
             <div className="ow-step-body">
-              <section className="ow-status">
-                <h2>{t("Offer sent", "Предложение отправлено", "Təklif göndərilib")}</h2>
-                <p>
-                  {t(
-                    `Version ${sentVersion} is with the customer`,
-                    `Версия ${sentVersion} у клиента`,
-                    `${sentVersion}-ci versiya müştərindədir`,
-                  )}
-                  {" · "}
-                  {fmt(total)}
-                </p>
-                {canEdit && (
-                  <button className="ow-outline" onClick={() => goTo("offer")}>
-                    {t("Edit and send a new version", "Изменить и отправить новую версию", "Dəyişib yeni versiya göndər")}
-                  </button>
-                )}
+              <ContractWorkspace
+                key={b.id}
+                bookingId={b.id}
+                auth={auth}
+                locale={l}
+                onChange={setContract}
+                onManage={() => goTo("manage")}
+              >
+                <section className="cw-offer">
+                  <header>
+                    <span className="cw-icon">
+                      <FileText size={24} aria-hidden="true" />
+                    </span>
+                    <div>
+                      <h3>{t("Offer", "Предложение", "Təklif")}</h3>
+                      <p>{draft?.title}</p>
+                    </div>
+                    {canEdit && (
+                      <button className="ow-outline" onClick={() => goTo("offer")}>
+                        <Pencil size={15} aria-hidden="true" />
+                        {t("Edit and send a new version", "Изменить и отправить новую версию", "Dəyişib yeni versiya göndər")}
+                      </button>
+                    )}
+                  </header>
+                  <dl className="cw-offer-facts">
+                    <div>
+                      <dt>{t("Version with the customer", "Версия у клиента", "Müştərinin gördüyü versiya")}</dt>
+                      <dd>v{sentVersion}</dd>
+                    </div>
+                    <div>
+                      <dt>{t("Total", "Итого", "Cəmi")}</dt>
+                      <dd>{fmt(total)}</dd>
+                    </div>
+                    <div>
+                      <dt>{t("Services", "Услуг", "Xidmət sayı")}</dt>
+                      <dd>{count}</dd>
+                    </div>
+                  </dl>
+                </section>
+              </ContractWorkspace>
+            </div>
+          )}
+
+          {stepKey === "manage" && accepted && (
+            <div className="ow-step-body ow-manage">
+              <section className="ow-manage-hero" hidden={step !== "manage"}>
+                <div className="ow-manage-title">
+                  <CircleCheck size={28} aria-hidden="true" />
+                  <div>
+                    <h2>{t("Contract accepted", "Договор принят", "Müqavilə təsdiqlənib")}</h2>
+                    <p>
+                      {contract?.accepted_at
+                        ? t("Accepted by the customer on ", "Принят клиентом: ", "Müştəri təsdiqləyib: ") +
+                          formatDateTime(contract.accepted_at)
+                        : t("Accepted by the customer", "Принят клиентом", "Müştəri təsdiqləyib")}
+                    </p>
+                  </div>
+                </div>
+                {(() => {
+                  const totalMinor = Math.round(total * 100);
+                  const share = totalMinor > 0 ? Math.min(100, Math.round((receivedMinor / totalMinor) * 100)) : 0;
+                  const left = Math.max(0, totalMinor - receivedMinor);
+                  return (
+                    <>
+                      <div className="ow-manage-money">
+                        <div>
+                          <small>{t("Offer total", "Сумма предложения", "Təklifin cəmi")}</small>
+                          <strong>{fmt(total)}</strong>
+                        </div>
+                        <div>
+                          <small>{t("Received", "Получено", "Daxil olub")}</small>
+                          <strong>{fmt(receivedMinor / 100)}</strong>
+                        </div>
+                        <div>
+                          <small>{t("Remaining", "Остаток", "Qalıq")}</small>
+                          <strong>{fmt(left / 100)}</strong>
+                        </div>
+                      </div>
+                      <div
+                        className="ow-progress"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={share}
+                        aria-label={t("Payment progress", "Ход оплаты", "Ödənişin gedişi")}
+                      >
+                        <span style={{ width: share + "%" }} />
+                      </div>
+                      <p className="ow-manage-next">
+                        {left === 0 && totalMinor > 0
+                          ? t("Fully paid. Make sure the tickets and documents are uploaded.", "Оплачено полностью. Проверьте, что билеты и документы загружены.", "Tam ödənilib. Biletlərin və sənədlərin yükləndiyini yoxlayın.")
+                          : receivedMinor === 0
+                            ? t("Next: request the deposit from the customer.", "Далее: запросите депозит у клиента.", "Növbəti: müştəridən beh tələb edin.")
+                            : t("Next: request the following payment or record the one received.", "Далее: запросите следующий платёж или запишите полученный.", "Növbəti: növbəti ödənişi tələb edin və ya daxil olanı qeyd edin.")}
+                      </p>
+                    </>
+                  );
+                })()}
               </section>
-              <details key={"docs" + b.id} className="ow-secondary ow-documents">
-                <summary>
-                  {t("Tickets & original documents", "Билеты и оригиналы документов", "Biletlər və orijinal sənədlər")}
-                </summary>
-                <TravelDocuments bookingId={b.id} auth={auth} locale={l} hideHeading />
-              </details>
-              <ContractWorkspace key={b.id} bookingId={b.id} auth={auth} locale={l} />
-              <FinanceWorkspace
-                bookingId={b.id}
-                auth={auth}
-                locale={l}
-                onDirtyChange={setFinanceDirty}
-              />
-              <PaymentWorkspace
-                key={"pay" + b.id}
-                bookingId={b.id}
-                auth={auth}
-                locale={l}
-                onDirtyChange={setPaymentDirty}
-              />
+              {step === "manage" && (
+                <div className="ow-hub">
+                  {[
+                    {
+                      key: "pay" as Step,
+                      icon: <CreditCard size={26} aria-hidden="true" />,
+                      title: t("Payments", "Платежи", "Ödənişlər"),
+                      text: t(
+                        "Request a payment from the customer and record what was received.",
+                        "Запросите платёж у клиента и запишите полученное.",
+                        "Müştəridən ödəniş tələb edin və daxil olanı qeyd edin.",
+                      ),
+                      meta: t("Received ", "Получено ", "Daxil olub ") + fmt(receivedMinor / 100),
+                    },
+                    {
+                      key: "finance" as Step,
+                      icon: <Landmark size={26} aria-hidden="true" />,
+                      title: t("Funds by service", "Средства по услугам", "Məbləğin bölgüsü"),
+                      text: t(
+                        "Show which service of the contract each received payment covers.",
+                        "Покажите, какую услугу договора покрывает каждая полученная оплата.",
+                        "Daxil olan ödənişin müqavilənin hansı xidmətini ödədiyini göstərin.",
+                      ),
+                      meta: "",
+                    },
+                    {
+                      key: "docs" as Step,
+                      icon: <Tickets size={26} aria-hidden="true" />,
+                      title: t("Tickets and documents", "Билеты и документы", "Biletlər və sənədlər"),
+                      text: t(
+                        "Upload tickets and original documents for the customer to download.",
+                        "Загрузите билеты и оригиналы документов для клиента.",
+                        "Müştərinin yükləməsi üçün bilet və orijinal sənədləri əlavə edin.",
+                      ),
+                      meta: "",
+                    },
+                    {
+                      key: "status" as Step,
+                      icon: <FileText size={26} aria-hidden="true" />,
+                      title: t("Offer and contract", "Предложение и договор", "Təklif və müqavilə"),
+                      text: t(
+                        "View the accepted offer and the signed contract.",
+                        "Посмотрите принятое предложение и договор.",
+                        "Təsdiqlənmiş təklifə və müqaviləyə baxın.",
+                      ),
+                      meta: "",
+                    },
+                  ].map((c) => (
+                    <button key={c.key} className="ow-hub-card" onClick={() => goTo(c.key)}>
+                      <span className="ow-hub-icon">{c.icon}</span>
+                      <span className="ow-hub-body">
+                        <strong>{c.title}</strong>
+                        <span>{c.text}</span>
+                        {c.meta && <em>{c.meta}</em>}
+                      </span>
+                      <ArrowRight size={20} aria-hidden="true" />
+                    </button>
+                  ))}
+                </div>
+              )}
+              {step !== "manage" && (
+                <>
+                  <button
+                    className="ow-hub-back"
+                    onClick={() => {
+                      if (
+                        (paymentDirty || financeDirty) &&
+                        !window.confirm(
+                          t(
+                            "Leave without saving what you typed?",
+                            "Выйти, не сохранив введённое?",
+                            "Yazdıqlarınız saxlanmadan çıxılsın?",
+                          ),
+                        )
+                      )
+                        return;
+                      goTo("manage");
+                    }}
+                  >
+                    <ArrowLeft size={17} aria-hidden="true" />
+                    {t("Back to Booking", "Назад к бронированию", "Rezervasiyaya qayıt")}
+                  </button>
+                  <section className="ow-manage-card">
+                    {step === "pay" && (
+                      <PaymentWorkspace
+                        key={"pay" + b.id}
+                        bookingId={b.id}
+                        auth={auth}
+                        locale={l}
+                        onDirtyChange={setPaymentDirty}
+                        onRecorded={() => void refreshReceived()}
+                        onOpenFinance={() => goTo("finance")}
+                      />
+                    )}
+                    {step === "finance" && (
+                      <FinanceWorkspace
+                        bookingId={b.id}
+                        auth={auth}
+                        locale={l}
+                        onDirtyChange={setFinanceDirty}
+                        onOpenPayments={() => goTo("pay")}
+                      />
+                    )}
+                    {step === "docs" && (
+                      <>
+                        <h2>{t("Tickets and original documents", "Билеты и оригиналы документов", "Biletlər və orijinal sənədlər")}</h2>
+                        <TravelDocuments key={"docs" + b.id} bookingId={b.id} auth={auth} locale={l} hideHeading />
+                      </>
+                    )}
+                  </section>
+                </>
+              )}
             </div>
           )}
         </>
@@ -1301,14 +2465,21 @@ export default function OfferWorkspace({
                 close();
               }}
             >
-              <h2>{t("Edit service", "Изменить услугу", "Xidməti dəyiş")}</h2>
+              <h2>{t("Service details", "Детали услуги", "Xidmət detalları")}</h2>
+              <p className="ow-sub">
+                {t(
+                  "Quantity, cost and margin are set in the route row.",
+                  "Количество, себестоимость и маржа задаются в строке маршрута.",
+                  "Say, maliyyət və marja marşrut sətrində təyin olunur.",
+                )}
+              </p>
               <p>
-                {editor.name} · {formatDay(b?.departure)}
+                {editor.name}, {formatDay(b?.departure)}
               </p>
               <PartnerPicker
                 auth={auth}
                 locale={l}
-                serviceKey={editor.key}
+                serviceKey={baseOf(editor.key)}
                 currency={draft.currency}
                 date={b?.departure || ""}
                 onSelect={(service) =>
@@ -1317,9 +2488,9 @@ export default function OfferWorkspace({
                     name: service.name,
                     supplier: service.partner_name,
                     location: service.location.slice(0, 100),
-                    unitPrice: service.price_minor / 100,
+                    ...priceLine(editor, service.price_minor / 100, lineMargin(editor)),
                     policy: service.policy,
-                    availability: "NOT_CHECKED",
+                    availability: "CONFIRMED",
                   })
                 }
               />
@@ -1356,7 +2527,7 @@ export default function OfferWorkspace({
                         setEditor({
                           ...editor,
                           supplier: e.target.value,
-                          availability: "NOT_CHECKED",
+                          availability: "CONFIRMED",
                         })
                       }
                     />
@@ -1370,110 +2541,11 @@ export default function OfferWorkspace({
                         setEditor({
                           ...editor,
                           location: e.target.value,
-                          availability: "NOT_CHECKED",
+                          availability: "CONFIRMED",
                         })
                       }
                     />
                   </label>
-                  <label>
-                    {t("Availability", "Наличие", "Mövcudluq")}
-                    <select
-                      value={editor.availability}
-                      onChange={(e) =>
-                        setEditor({
-                          ...editor,
-                          availability: e.target
-                            .value as OfferLine["availability"],
-                        })
-                      }
-                    >
-                      {["NOT_CHECKED", "CONFIRMED", "UNAVAILABLE"].map((v) => (
-                        <option key={v} value={v}>
-                          {availability(v)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <small>
-                    {t(
-                      "Records an office check; does not book the supplier.",
-                      "Фиксирует проверку, не бронирует поставщика.",
-                      "Ofis yoxlamasını qeyd edir, təchizatçıda rezervasiya etmir.",
-                    )}
-                  </small>
-                </div>
-                <div>
-                  <h3>
-                    {t("Customer price", "Цена для клиента", "Müştəri qiyməti")}
-                  </h3>
-                  <label>
-                    {t("Quantity", "Количество", "Say")}
-                    <input
-                      type="number"
-                      min={1}
-                      max={168}
-                      step={1}
-                      required
-                      value={editor.quantity}
-                      onChange={(e) =>
-                        setEditor({
-                          ...editor,
-                          quantity: Number(e.target.value),
-                          availability: "NOT_CHECKED",
-                        })
-                      }
-                    />
-                  </label>
-                  {editor.key === "hotel" && (
-                    <label>
-                      {t("Nights", "Ночей", "Gecə")}
-                      <input
-                        type="number"
-                        min={1}
-                        max={14}
-                        step={1}
-                        required
-                        value={editor.nights}
-                        onChange={(e) =>
-                          setEditor({
-                            ...editor,
-                            nights: Number(e.target.value),
-                            availability: "NOT_CHECKED",
-                          })
-                        }
-                      />
-                    </label>
-                  )}
-                  <label>
-                    {t("Unit price", "Цена за единицу", "Vahid qiyməti")} (
-                    {draft.currency})
-                    <input
-                      required
-                      type="number"
-                      min={0.000001}
-                      max={100000}
-                      step={0.000001}
-                      value={editor.unitPrice}
-                      onChange={(e) =>
-                        setEditor({
-                          ...editor,
-                          unitPrice: Number(e.target.value),
-                        })
-                      }
-                    />
-                  </label>
-                  <div className="ow-summary-line ow-total">
-                    <strong>
-                      {t("Service total", "Стоимость услуги", "Xidmətin cəmi")}
-                    </strong>
-                    <strong>
-                      {fmt(
-                        Math.round(
-                          editor.quantity * editor.nights * editor.unitPrice,
-                        ),
-                      )}
-                    </strong>
-                  </div>
                 </div>
                 <label>
                   {t(
@@ -1497,16 +2569,6 @@ export default function OfferWorkspace({
                     )}
                   </small>
                 </label>
-              </div>
-              <div className="ow-sage">
-                {editor.quantity} × {editor.nights} × {fmt(editor.unitPrice)} ={" "}
-                <strong>
-                  {fmt(
-                    Math.round(
-                      editor.quantity * editor.nights * editor.unitPrice,
-                    ),
-                  )}
-                </strong>
               </div>
               <small>
                 {t(

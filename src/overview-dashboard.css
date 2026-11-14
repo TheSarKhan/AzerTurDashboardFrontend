@@ -309,3 +309,10 @@
     font-size: 28px;
   }
 }
+.ov-attention {
+  margin-bottom: 4px;
+}
+.ov-attention ul {
+  display: grid;
+  gap: 8px;
+}

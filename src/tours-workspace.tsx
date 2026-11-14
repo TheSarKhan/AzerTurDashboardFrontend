@@ -152,9 +152,9 @@ export function ToursWorkspace({
               value={form.region}
               onChange={(e) => set("region", e.target.value)}
               placeholder={t(
-                "Quba · Khinalug",
-                "Куба · Хыналыг",
-                "Quba · Xınalıq",
+                "Quba, Khinalug",
+                "Куба, Хыналыг",
+                "Quba, Xınalıq",
               )}
             />
           </label>

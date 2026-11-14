@@ -1,3 +1,4 @@
+import { paxRange } from "./pax";
 import { OverviewDashboard } from "./overview-dashboard";
 import { ToursWorkspace } from "./tours-workspace";
 import { OPEN_VIEWS, navigate, useRoute } from "./route";
@@ -5,7 +6,8 @@ import { OPEN_VIEWS, navigate, useRoute } from "./route";
 const SESSION_KEY = "aztrip.staff.session";
 import OfficeManagement from "./office-management";
 import { RefundWorkspace } from "./finance-workspace";
-import { Handshake, Lock } from "lucide-react";
+import { Handshake, Lock, MessageSquare, XCircle, RefreshCw as ChangeIcon, ArrowRight as GoIcon } from "lucide-react";
+import "./customer-requests.css";
 import AmendmentWorkspace from "./amendment-workspace";
 import CancellationWorkspace from "./cancellation-workspace";
 import React, { useState, useEffect } from "react";
@@ -65,13 +67,14 @@ function QuoteDetails({
         transfer: boolean;
         activity: boolean;
         cities?: string[];
+        extras?: string[];
       };
       lines: { label: string; amount: number }[];
     };
     const labels: Record<string, string> = {
       transport: t("Private driver", "Личный водитель", "Şəxsi sürücü"),
       hotel: t("Hotel stay", "Проживание", "Oteldə qalma"),
-      guide: t("Local guide", "Гид", "Gid"),
+      guide: t("Local guide", "Гид", "Bələdçi"),
       transfer: t("Airport transfer", "Трансфер", "Transfer"),
       activity: t("Experience", "Впечатление", "Təcrübə"),
     };
@@ -87,7 +90,7 @@ function QuoteDetails({
           <dt>{t("Departure", "Отправление", "Başlama")}</dt>
           <dd>{formatDay(q.input.date)}</dd>
           <dt>{t("Travellers", "Участники", "Səyahətçilər")}</dt>
-          <dd>{q.input.pax}</dd>
+          <dd>{paxRange(q.input.pax)}</dd>
           {q.input.stay !== false && (
             <>
               <dt>
@@ -98,11 +101,28 @@ function QuoteDetails({
           )}
           {q.input.guide && (
             <>
-              <dt>{t("Guide language", "Язык гида", "Gidin dili")}</dt>
+              <dt>{t("Guide language", "Язык гида", "Bələdçinin dili")}</dt>
               <dd>
                 {{ en: "English", ru: "Русский", az: "Azərbaycanca" }[
                   q.input.guideLanguage
                 ] || q.input.guideLanguage}
+              </dd>
+            </>
+          )}
+          {!!q.input.extras?.length && (
+            <>
+              <dt>{t("Extras", "Дополнительно", "Əlavələr")}</dt>
+              <dd>
+                {q.input.extras
+                  .map(
+                    (k) =>
+                      ({
+                        meals: t("Local meals", "Местная кухня", "Yerli yeməklər"),
+                        tickets: t("Entrance tickets", "Входные билеты", "Giriş biletləri"),
+                        photographer: t("Photographer", "Фотограф", "Fotoqraf"),
+                      })[k] ?? k,
+                  )
+                  .join(", ")}
               </dd>
             </>
           )}
@@ -160,6 +180,7 @@ function App() {
   const [catalog, setCatalog] = useState<Tour[]>([]),
     [reservations, setReservations] = useState<Booking[]>([]),
     [inbox, setInbox] = useState<BookingRequest[]>([]),
+    [inboxTab, setInboxTab] = useState<"PENDING" | "ALL">("PENDING"),
     [outbox, setOutbox] = useState<Notification[]>([]),
     [auth, setAuth] = useState(""),
     [staff, setStaff] = useState<Staff | null>(null),
@@ -566,7 +587,7 @@ function App() {
           <p className="workspace who">
             {staff.name}
             <br />
-            {staff.email} ·{" "}
+            {staff.email},{" "}
             {staff.role === "ADMIN"
               ? t("Administrator", "Администратор", "Administrator")
               : t("Operator", "Оператор", "Operator")}
@@ -709,46 +730,96 @@ function App() {
           !amendmentRequestId &&
           !(cancelRequestId && inbox.find((r) => r.id === cancelRequestId)) && (
             <>
-              <p>
+              <p className="cq-intro">
                 {t(
                   "Staff handle every change and cancellation. For changes, describe the agreed arrangement in the response.",
                   "Все изменения и отмены обрабатывает сотрудник. Для изменений опишите согласованный вариант в ответе.",
                   "Hər dəyişiklik və ləğvi əməkdaş idarə edir. Dəyişiklik üçün razılaşdırılmış detalları cavabda qeyd edin.",
                 )}
               </p>
-              {inbox.map((r) => (
-                <article key={r.id} className="reservation">
-                  <small>{r.bookingId}</small>
-                  <h2>
-                    {r.kind === "CANCEL"
-                      ? t("Cancellation", "Отмена", "Ləğv")
-                      : t(
-                          "Change request",
-                          "Изменение",
-                          "Dəyişiklik sorğusu",
-                        )}{" "}
-                    · {r.status}
-                  </h2>
-                  <p className="customer-note">{r.message}</p>
-                  {r.kind === "CANCEL" && (
-                    <button onClick={() => setCancelRequestId(r.id)}>
-                      {t(
-                        "Review cancellation",
-                        "Проверить отмену",
-                        "Ləğvə bax",
-                      )}
+              <div className="cq-tabs" role="tablist">
+                {(
+                  [
+                    ["PENDING", t("Waiting for a reply", "Ждут ответа", "Cavab gözləyir"), inbox.filter((x) => x.status === "PENDING").length],
+                    ["ALL", t("All", "Все", "Hamısı"), inbox.length],
+                  ] as const
+                ).map(([key, label, count]) => (
+                  <button
+                    key={key}
+                    role="tab"
+                    aria-selected={inboxTab === key}
+                    className={inboxTab === key ? "on" : ""}
+                    onClick={() => setInboxTab(key)}
+                  >
+                    {label}
+                    <em>{count}</em>
+                  </button>
+                ))}
+              </div>
+              {[...inbox]
+                .filter((x) => inboxTab === "ALL" || x.status === "PENDING")
+                .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+                .map((r) => {
+                const trip = reservations.find((b) => b.id === r.bookingId);
+                const tripRoute = (() => {
+                  try {
+                    const c = JSON.parse(trip?.quotePayload || "{}").input?.cities;
+                    return Array.isArray(c) && c.length ? c.join(" → ") : trip?.title || "";
+                  } catch {
+                    return trip?.title || "";
+                  }
+                })();
+                return (
+                <article key={r.id} className={"reservation cq-card" + (r.status === "PENDING" ? " pending" : "")}>
+                  <header className="cq-head">
+                    <span className={"cq-kind " + r.kind}>
+                      {r.kind === "CANCEL" ? <XCircle size={16} aria-hidden="true" /> : <ChangeIcon size={16} aria-hidden="true" />}
+                      {r.kind === "CANCEL"
+                        ? t("Cancellation", "Отмена", "Ləğv sorğusu")
+                        : t("Change request", "Изменение", "Dəyişiklik sorğusu")}
+                    </span>
+                    <span className={"cq-status " + r.status}>
+                      {r.status === "PENDING"
+                        ? t("Waiting for a reply", "Ждёт ответа", "Cavab gözləyir")
+                        : r.status === "ACCEPTED"
+                          ? t("Accepted", "Принято", "Qəbul edilib")
+                          : t("Declined", "Отклонено", "Rədd edilib")}
+                    </span>
+                    <small>{formatDateTime(r.createdAt)}</small>
+                  </header>
+                  <button className="cq-trip" onClick={() => navigate({ view: "Bookings", id: r.bookingId })}>
+                    <span>
+                      <strong>#{r.bookingId.slice(0, 8)}</strong>
+                      {tripRoute && <em>{tripRoute}</em>}
+                      {trip?.departure && <em>{formatDay(trip.departure)}</em>}
+                    </span>
+                    <GoIcon size={16} aria-hidden="true" />
+                  </button>
+                  <div className="cq-said">
+                    <small>
+                      <MessageSquare size={14} aria-hidden="true" />
+                      {t("Customer wrote", "Клиент написал", "Müştəri yazıb")}
+                    </small>
+                    <p className="customer-note">{r.message}</p>
+                  </div>
+                  {r.response && (
+                    <div className="cq-said reply">
+                      <small>{t("Your reply", "Ваш ответ", "Sizin cavabınız")}</small>
+                      <p className="customer-note">{r.response}</p>
+                    </div>
+                  )}
+                  {r.status === "PENDING" && r.kind === "CANCEL" && (
+                    <button className="cq-primary" onClick={() => setCancelRequestId(r.id)}>
+                      {t("Review cancellation", "Проверить отмену", "Ləğvə bax")}
+                      <GoIcon size={16} aria-hidden="true" />
                     </button>
                   )}
-                  {r.kind === "CHANGE" && (
-                    <button onClick={() => setAmendmentRequestId(r.id)}>
-                      {t(
-                        "Review contract amendment",
-                        "Проверить изменение договора",
-                        "Müqavilə dəyişikliyini hazırla",
-                      )}
+                  {r.status === "PENDING" && r.kind === "CHANGE" && (
+                    <button className="cq-primary" onClick={() => setAmendmentRequestId(r.id)}>
+                      {t("Review contract amendment", "Проверить изменение договора", "Müqavilə dəyişikliyini hazırla")}
+                      <GoIcon size={16} aria-hidden="true" />
                     </button>
                   )}
-                  {r.response && <p>{r.response}</p>}
                   {r.status === "PENDING" && r.kind === "CHANGE" && (
                     <details>
                       <summary>
@@ -875,7 +946,7 @@ function App() {
                   {amendments[r.id] && (
                     <p className="customer-note">
                       {t("Revised total", "Новая сумма", "Yenilənmiş məbləğ")}:{" "}
-                      {amendments[r.id].total} {amendments[r.id].currency} ·{" "}
+                      {amendments[r.id].total} {amendments[r.id].currency},{" "}
                       {amendments[r.id].id.slice(0, 8)}
                     </p>
                   )}
@@ -952,7 +1023,8 @@ function App() {
                     </form>
                   )}
                 </article>
-              ))}
+                );
+              })}
               {!inbox.length && (
                 <div className="empty">
                   {t(

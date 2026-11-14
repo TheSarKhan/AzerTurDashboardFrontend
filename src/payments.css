@@ -100,3 +100,91 @@
 }
 .payment-record > p { grid-column: 1 / -1; margin: 0; }
 .payment-record label { display: grid; gap: 6px; font-size: 12px; }
+
+/* The dashboard's global input, button and aside rules made this form unreadable: fix them here. */
+.payment-ops input[type="radio"] {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  accent-color: #235140;
+}
+.payment-ops label:has(input[type="radio"]) {
+  padding: 12px 14px;
+  border: 1px solid #cbd5cc;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+.payment-ops label:has(input[type="radio"]:checked) {
+  border-color: #235140;
+  background: #f0f6f1;
+}
+.payment-ops .payment-grid > aside {
+  display: block;
+  background: #eef2e9;
+  color: #172721;
+  border-radius: 8px;
+  padding: 20px;
+}
+.payment-ops .payment-grid > aside h3 {
+  margin-top: 0;
+}
+.payment-ops .payment-actions button {
+  color: #235140;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.payment-ops .payment-actions .payment-primary {
+  color: #fff;
+}
+.payment-ops input[type="number"],
+.payment-ops select,
+.payment-ops textarea {
+  width: 100%;
+  margin-top: 6px;
+  border-radius: 6px;
+}
+.payment-ops > button {
+  margin: 6px 0 12px;
+}
+.payment-ops label:has(input[type="radio"]) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.payment-ops .payment-actions {
+  margin-bottom: 24px;
+}
+
+.payment-hint {
+  margin: -12px 0 24px;
+  font-size: 13px;
+  color: #5d675f;
+}
+
+.payment-outcomes {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.payment-outcomes button {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid #1f4d3a;
+  background: #fff;
+  color: #1f4d3a;
+  font-weight: 700;
+  cursor: pointer;
+}
+.payment-outcomes .payment-ok {
+  background: #1f4d3a;
+  color: #fff;
+}
+.payment-outcomes .payment-bad {
+  border-color: #a3382b;
+  color: #a3382b;
+}

@@ -91,7 +91,7 @@ export default function CancellationWorkspace({
       "Şəxsi avtomobil və sürücü",
     ),
     hotel: t("Comfort stay", "Проживание", "Oteldə qalma"),
-    guide: t("Local guide", "Местный гид", "Yerli gid"),
+    guide: t("Local guide", "Местный гид", "Yerli bələdçi"),
     transfer: t("Airport transfer", "Трансфер", "Hava limanı transferi"),
     activity: t(
       "Local craft experience",
@@ -462,7 +462,7 @@ export default function CancellationWorkspace({
             )}
           </h1>
           <p>
-            #{request.bookingId.slice(0, 8)} · {date(request.createdAt)}
+            #{request.bookingId.slice(0, 8)}, {date(request.createdAt)}
           </p>
         </div>
         <button disabled={busy || dirty} onClick={() => void load()}>
@@ -489,15 +489,15 @@ export default function CancellationWorkspace({
         <>
           <div className="cancel-trip">
             <strong>
-              {context.customer?.name} · {context.offer.title}
+              {context.customer?.name}, {context.offer.title}
             </strong>
             <span>
-              {formatDay(context.offer.date)} · {context.offer.travelers}{" "}
+              {formatDay(context.offer.date)}, {context.offer.travelers}{" "}
               {t("travelers", "чел.", "nəfər")}
             </span>
             <p>
-              {context.customer?.email} ·{" "}
-              {context.customer?.locale.toUpperCase()} ·{" "}
+              {context.customer?.email},{" "}
+              {context.customer?.locale.toUpperCase()},{" "}
               {t("Contract", "Договор", "Müqavilə")} v{context.contractVersion}
             </p>
             <p>{request.message}</p>
@@ -513,9 +513,9 @@ export default function CancellationWorkspace({
             <div>
               <h2>
                 {t(
-                  "01 · Allocate received payments",
-                  "01 · Распределить оплату",
-                  "01 · Ödənişi xidmətlərə böl",
+                  "01 Allocate received payments",
+                  "01 Распределить оплату",
+                  "01 Ödənişi xidmətlərə böl",
                 )}
               </h2>
               <div className="cancel-allocation">
@@ -797,7 +797,7 @@ export default function CancellationWorkspace({
                                 ? t("Retained", "Удержано", "Saxlanılan") +
                                   ": " +
                                   fmt(est.fee) +
-                                  " · " +
+                                  ", " +
                                   t("Refund", "Возврат", "Geri qaytarılacaq") +
                                   ": " +
                                   fmt(est.refund)
@@ -847,9 +847,9 @@ export default function CancellationWorkspace({
               </label>
               <label>
                 {t(
-                  "Internal notes · staff only",
+                  "Internal notes, staff only",
                   "Внутренние заметки",
-                  "Daxili qeydlər · yalnız əməkdaşlar",
+                  "Daxili qeydlər, yalnız əməkdaşlar",
                 )}
                 <textarea
                   disabled={busy || readonly}
@@ -911,16 +911,16 @@ export default function CancellationWorkspace({
                       )
                     : saved.state === "APPROVED"
                       ? t(
-                          "Cancellation approved · refund pending",
-                          "Отмена одобрена · возврат ожидается",
-                          "Ləğv təsdiqlənib · geri ödəniş gözləyir",
+                          "Cancellation approved, refund pending",
+                          "Отмена одобрена, возврат ожидается",
+                          "Ləğv təsdiqlənib, geri ödəniş gözləyir",
                         )
                       : t(
                           "Saved assessment",
                           "Расчёт сохранён",
                           "Hesablama saxlanılıb",
                         )}{" "}
-                  · v{saved.version}
+                 , v{saved.version}
                 </p>
               )}
             </aside>

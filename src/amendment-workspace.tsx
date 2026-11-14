@@ -278,7 +278,7 @@ export default function AmendmentWorkspace({
             <div>
               <strong>{c.offer.title}</strong>
               <p>
-                {formatDay(c.offer.date)} · {c.offer.travelers}{" "}
+                {formatDay(c.offer.date)}, {c.offer.travelers}{" "}
                 {t("travelers", "туристов", "nəfər")}
               </p>
               <p>
@@ -481,7 +481,7 @@ export default function AmendmentWorkspace({
                       "Şəxsi sürücü",
                     ],
                     ["stay", "Hotel", "Отель", "Otel"],
-                    ["guide", "Guide", "Гид", "Gid"],
+                    ["guide", "Guide", "Гид", "Bələdçi"],
                     ["transfer", "Transfer", "Трансфер", "Transfer"],
                     ["activity", "Experience", "Впечатление", "Təcrübə"],
                   ] as const
@@ -763,7 +763,7 @@ export default function AmendmentWorkspace({
                 {d.services.map((v, i) => (
                   <article className="amendment-service" key={v.key}>
                     <h4>
-                      {v.name} · {fmt(lineAmount(v) * 100)}
+                      {v.name}, {fmt(lineAmount(v) * 100)}
                     </h4>
                     <div className="amendment-grid">
                       <label>
@@ -1020,7 +1020,7 @@ export default function AmendmentWorkspace({
                       "PDF и окончательная проверка",
                       "PDF və yekun yoxlama",
                     )}{" "}
-                    · v{saved.version}
+                   , v{saved.version}
                   </h3>
                   <label>
                     {t(
@@ -1219,7 +1219,7 @@ export default function AmendmentWorkspace({
             </h3>
             {c.versions.map((v) => (
               <div className="security-session" key={v.id}>
-                v{v.draft_version} · {v.state}{" "}
+                v{v.draft_version}, {v.state}{" "}
                 <button
                   disabled={busy}
                   onClick={() =>

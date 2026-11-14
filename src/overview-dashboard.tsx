@@ -503,6 +503,34 @@ export function OverviewDashboard({
       </div>
 
       <div className={"ov-body" + (loading ? " loading" : "")}>
+        <section className="ov-card ov-attention">
+          <h2>
+            {t("Needs attention", "Требует внимания", "Diqqət tələb edənlər")}
+          </h2>
+          {waiting.length === 0 ? (
+            <p className="ov-empty">
+              {t(
+                "Everything is in order.",
+                "Всё в порядке.",
+                "Hər şey qaydasındadır.",
+              )}
+            </p>
+          ) : (
+            <ul>
+              {waiting.map((a) => (
+                <li key={a.key}>
+                  <button onClick={() => onNavigate(a.view)}>
+                    <a.icon size={18} aria-hidden="true" />
+                    <span>{a.text}</span>
+                    <b>{a.n}</b>
+                    <ArrowRight size={16} aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         <div className={"ov-tiles" + (data.finance ? " six" : "")}>
           <Tile
             icon={FileText}
@@ -839,7 +867,7 @@ export function OverviewDashboard({
                 rows={f.methods.map((m) => ({
                   label: methodNames[m.method] ?? m.method,
                   value: m.amount,
-                  hint: `${compact(m.amount)} ₼ · ${m.n}`,
+                  hint: `${compact(m.amount)} ₼, ${m.n}`,
                 }))}
                 color="var(--ov-money)"
                 format={azn}
@@ -859,40 +887,13 @@ export function OverviewDashboard({
                   :{" "}
                   {Object.entries(f.byCurrency)
                     .map(([c, v]) => `${compact(v)} ${c}`)
-                    .join(" · ")}
+                    .join(", ")}
                 </p>
               )}
             </section>
           </div>
         )}
 
-        <section className="ov-card ov-attention">
-          <h2>
-            {t("Needs attention", "Требует внимания", "Diqqət tələb edənlər")}
-          </h2>
-          {waiting.length === 0 ? (
-            <p className="ov-empty">
-              {t(
-                "Everything is in order.",
-                "Всё в порядке.",
-                "Hər şey qaydasındadır.",
-              )}
-            </p>
-          ) : (
-            <ul>
-              {waiting.map((a) => (
-                <li key={a.key}>
-                  <button onClick={() => onNavigate(a.view)}>
-                    <a.icon size={18} aria-hidden="true" />
-                    <span>{a.text}</span>
-                    <b>{a.n}</b>
-                    <ArrowRight size={16} aria-hidden="true" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
       </div>
     </section>
   );

@@ -1,6 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  BedDouble,
+  Bus,
+  Car,
+  Check,
+  CircleCheck,
+  Flower2,
+  Landmark,
+  Lock,
+  Plane,
+  RefreshCw,
+  Send,
+  Users,
+  Wand2,
+  Wallet,
+} from "lucide-react";
 import { api, type Locale } from "./api/client";
 import "./office-management.css";
+import "./finance-workspace.css";
+const SERVICE_ICON: Record<string, ReactNode> = {
+  transport: <Car size={20} />,
+  hotel: <BedDouble size={20} />,
+  guide: <Users size={20} />,
+  transfer: <Plane size={20} />,
+  intercity: <Bus size={20} />,
+  activity: <Flower2 size={20} />,
+};
 type Service = { key: string; name: string; total: number };
 type Plan = { id: string; version: number; payload: string; state: string };
 type Context = {
@@ -18,11 +43,14 @@ export function FinanceWorkspace({
   auth,
   locale: l,
   onDirtyChange,
+  onOpenPayments,
 }: {
   bookingId: string;
   auth: string;
   locale: Locale;
   onDirtyChange: (v: boolean) => void;
+  /** Opens the payments page, shown when no money has been received yet. */
+  onOpenPayments?: () => void;
 }) {
   const t = (en: string, ru: string, az: string) =>
     l === "az" ? az : l === "ru" ? ru : en;
@@ -131,26 +159,86 @@ export function FinanceWorkspace({
       setBusy(false);
     }
   }
+  const allocatable = c?.allocatableMinor ?? 0;
+  const left = allocatable - sum;
+  const rowValid = (svc: Service) =>
+    Number.isFinite(Number(shares[svc.key] || 0)) &&
+    Number(shares[svc.key] || 0) >= 0 &&
+    Number(shares[svc.key] || 0) <= svc.total;
+  const allValid = !!c && c.services.every(rowValid);
+  const setShare = (key: string, value: string) => {
+    setShares({ ...shares, [key]: value });
+    setDirty(true);
+    setNotice("");
+  };
+  /** Gives each service a share of the received money in proportion to its price. */
+  function autoSplit() {
+    if (!c || !c.services.length) return;
+    const caps = c.services.map((x) => Math.round(x.total * 100));
+    const totalCap = caps.reduce((a, b) => a + b, 0) || 1;
+    const out = caps.map((cap) => Math.min(cap, Math.floor((allocatable * cap) / totalCap)));
+    let rest = allocatable - out.reduce((a, b) => a + b, 0);
+    for (let i = 0; rest > 0 && i < out.length; i++) {
+      const add = Math.min(rest, caps[i] - out[i]);
+      out[i] += add;
+      rest -= add;
+    }
+    setShares(Object.fromEntries(c.services.map((x, i) => [x.key, String(out[i] / 100)])));
+    setDirty(true);
+    setNotice("");
+  }
+  function fillRest(svc: Service) {
+    const current = Math.round(Number(shares[svc.key] || 0) * 100);
+    const room = Math.round(svc.total * 100) - current;
+    const add = Math.max(0, Math.min(room, left));
+    setShare(svc.key, String((current + add) / 100));
+  }
+  const saveHint = !finance
+    ? t("Only finance staff can change the split.", "Менять распределение может финансовый сотрудник.", "Bölgünü yalnız maliyyə işçisi dəyişə bilər.")
+    : !allValid
+      ? t("Check the amounts: each must be between zero and the service price.", "Проверьте суммы: от нуля до цены услуги.", "Məbləğləri yoxlayın: hər biri sıfırla xidmət qiyməti arasında olmalıdır.")
+      : left > 0
+        ? t(`${fmt(left)} is still unallocated.`, `Не распределено ${fmt(left)}.`, `${fmt(left)} hələ bölünməyib.`)
+        : left < 0
+          ? t(`${fmt(-left)} too much is allocated.`, `Распределено больше на ${fmt(-left)}.`, `${fmt(-left)} artıq bölünüb.`)
+          : !dirty
+            ? t("The split is saved.", "Распределение сохранено.", "Bölgü saxlanılıb.")
+            : t("Everything adds up. Save the split.", "Всё сходится. Сохраните.", "Hər şey düzgündür. Bölgünü saxlayın.");
   return (
-    <section className="om om-finance">
-      <div className="om-heading">
+    <section className="om om-finance fw">
+      <div className="fw-head">
+        <span className="fw-icon">
+          <Landmark size={24} aria-hidden="true" />
+        </span>
         <div>
-          <h2>
-            {t(
-              "Allocate received funds",
-              "Распределить полученные средства",
-              "Alınmış məbləğin bölgüsü",
-            )}
-          </h2>
+          <h2>{t("Funds by service", "Средства по услугам", "Məbləğin bölgüsü")}</h2>
           <p>
             {t(
-              "Assign received funds to each contracted service. Open requests are not received funds.",
-              "Распределите только полученные средства по услугам.",
-              "Yalnız alınmış məbləği müqavilədəki xidmətlərə bölüşdürün.",
+              "Show which service each received payment covers. Only money that has arrived counts, not open requests.",
+              "Покажите, какую услугу покрывает полученная оплата. Считаются только поступившие деньги.",
+              "Daxil olan pulun hansı xidməti ödədiyini göstərin. Yalnız daxil olmuş pul sayılır, açıq tələblər yox.",
             )}
           </p>
         </div>
-        <button disabled={busy || dirty} onClick={() => void load()}>
+        <button
+          className="fw-refresh"
+          disabled={busy}
+          onClick={() => {
+            if (
+              dirty &&
+              !window.confirm(
+                t(
+                  "Discard what you typed and reload?",
+                  "Отменить введённое и обновить?",
+                  "Yazdıqlarınız silinib səhifə yenilənsin?",
+                ),
+              )
+            )
+              return;
+            void load();
+          }}
+        >
+          <RefreshCw size={16} aria-hidden="true" />
           {t("Refresh", "Обновить", "Yenilə")}
         </button>
       </div>
@@ -160,84 +248,153 @@ export function FinanceWorkspace({
         </p>
       )}
       {notice && (
-        <p role="status" className="om-notice">
+        <p role="status" className="fw-notice">
+          <CircleCheck size={18} aria-hidden="true" />
           {notice}
         </p>
       )}
-      {c?.contractId && (
-        <>
-          <p>
+      {c?.contractId && allocatable === 0 && (
+        <div className="fw-empty">
+          <Wallet size={34} aria-hidden="true" />
+          <strong>{t("No money has been received yet", "Деньги ещё не поступали", "Hələ pul daxil olmayıb")}</strong>
+          <span>
             {t(
-              "Available for active services",
-              "Доступно для действующих услуг",
-              "Aktiv xidmətlərə bölünəcək məbləğ",
+              "Once a payment is recorded as received, you can split it between the services here.",
+              "Когда оплата будет записана как полученная, её можно распределить здесь.",
+              "Ödəniş daxil olmuş kimi qeyd ediləndən sonra onu burada xidmətlər arasında bölə bilərsiniz.",
             )}
-            : <strong className="om-number">{fmt(c.allocatableMinor)}</strong>
-          </p>
+          </span>
+          {onOpenPayments && (
+            <button className="ow-primary" onClick={onOpenPayments}>
+              {t("Go to Payments", "Перейти к платежам", "Ödənişlərə keç")}
+            </button>
+          )}
+        </div>
+      )}
+      {c?.contractId && allocatable > 0 && (
+        <>
+          <div className="fw-stats">
+            <div>
+              <small>{t("Received", "Получено", "Daxil olub")}</small>
+              <strong>{fmt(allocatable)}</strong>
+            </div>
+            <div>
+              <small>{t("Allocated", "Распределено", "Bölünüb")}</small>
+              <strong>{fmt(sum)}</strong>
+            </div>
+            <div className={left === 0 ? "ok" : "todo"}>
+              <small>{t("Unallocated", "Осталось", "Bölünməyib")}</small>
+              <strong>{fmt(left)}</strong>
+            </div>
+          </div>
+          <div
+            className={"fw-bar" + (left === 0 ? " ok" : left < 0 ? " over" : "")}
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.min(100, Math.round((sum / allocatable) * 100))}
+          >
+            <span style={{ width: Math.min(100, (sum / allocatable) * 100) + "%" }} />
+          </div>
           {!finance && (
-            <p>
+            <p className="fw-lock">
+              <Lock size={16} aria-hidden="true" />
               {t(
-                "Finance access is required to change allocations.",
-                "Для изменений нужен доступ финансов.",
-                "Bölgünü dəyişmək üçün maliyyə icazəsi lazımdır.",
+                "Finance access is required to change the split. You can view it here.",
+                "Для изменений нужен доступ финансов. Здесь можно только смотреть.",
+                "Bölgünü dəyişmək üçün maliyyə icazəsi lazımdır. Burada yalnız baxa bilərsiniz.",
               )}
             </p>
           )}
           {c.allocation && !c.allocationCurrent && (
-            <p className="error">
+            <p className="fw-warn" role="alert">
               {t(
-                "The saved allocation is outdated. Review it using the current amount and services.",
+                "The saved split is outdated. Review it using the current amount and services.",
                 "Распределение устарело. Проверьте текущую сумму и услуги.",
                 "Saxlanmış bölgü köhnəlib. Cari məbləğ və xidmətlərlə yenidən yoxlayın.",
               )}
             </p>
           )}
-          <div className="om-fields">
-            {c.services.map((s) => (
-              <label key={s.key}>
-                {s.name} · {t("Service price", "Цена услуги", "Xidmət qiyməti")}{" "}
-                {fmt(s.total * 100)}
-                <input
-                  type="number"
-                  min="0"
-                  max={s.total}
-                  step=".01"
-                  value={shares[s.key] || ""}
-                  disabled={!finance || busy}
-                  onChange={(e) => {
-                    setShares({ ...shares, [s.key]: e.target.value });
-                    setDirty(true);
-                    setNotice("");
-                  }}
-                />
-              </label>
-            ))}
+          {finance && (
+            <div className="fw-tools">
+              <button className="fw-link" disabled={busy} onClick={autoSplit}>
+                <Wand2 size={15} aria-hidden="true" />
+                {t("Split in proportion to prices", "Разделить пропорционально ценам", "Qiymətlərə mütənasib böl")}
+              </button>
+              <button
+                className="fw-link"
+                disabled={busy}
+                onClick={() => {
+                  setShares(Object.fromEntries(c.services.map((x) => [x.key, "0"])));
+                  setDirty(true);
+                  setNotice("");
+                }}
+              >
+                {t("Clear all", "Очистить всё", "Hamısını sıfırla")}
+              </button>
+            </div>
+          )}
+          <div className="fw-rows">
+            {c.services.map((svc) => {
+              const value = Number(shares[svc.key] || 0);
+              const pct = svc.total > 0 ? Math.min(100, (value / svc.total) * 100) : 0;
+              const full = Math.round(value * 100) === Math.round(svc.total * 100);
+              return (
+                <div className={"fw-row" + (rowValid(svc) ? "" : " bad")} key={svc.key}>
+                  <span className="fw-row-icon">{SERVICE_ICON[svc.key.split("-")[0]] ?? <Flower2 size={20} />}</span>
+                  <div className="fw-row-name">
+                    <strong>{svc.name}</strong>
+                    <small>
+                      {t("Price", "Цена", "Qiymət")} {fmt(svc.total * 100)}
+                      {full ? ", " + t("fully covered", "покрыто полностью", "tam ödənilir") : ""}
+                    </small>
+                    <div className={"fw-mini" + (full ? " ok" : "")}>
+                      <span style={{ width: pct + "%" }} />
+                    </div>
+                  </div>
+                  <label className="fw-amount">
+                    <span className="sr-only">{svc.name}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max={svc.total}
+                      step=".01"
+                      inputMode="decimal"
+                      value={shares[svc.key] || ""}
+                      disabled={!finance || busy}
+                      onChange={(e) => setShare(svc.key, e.target.value)}
+                    />
+                    <em>{c.offer.currency}</em>
+                  </label>
+                  {finance && (
+                    <button
+                      className="fw-link"
+                      disabled={busy || left <= 0 || full}
+                      onClick={() => fillRest(svc)}
+                      title={t("Put the unallocated money here", "Положить сюда остаток", "Bölünməyən məbləği bura yaz")}
+                    >
+                      {t("Add the rest", "Добавить остаток", "Qalanı yaz")}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
-          <p>
-            {t("Allocated", "Распределено", "Bölünüb")}: {fmt(sum)} ·{" "}
-            {t("Unallocated", "Осталось", "Bölünməyib")}:{" "}
-            {fmt(c.allocatableMinor - sum)}
-          </p>
-          <button
-            className="om-primary"
-            disabled={
-              busy ||
-              !finance ||
-              !dirty ||
-              sum !== c.allocatableMinor ||
-              c.services.some(
-                (s) =>
-                  !Number.isFinite(Number(shares[s.key])) ||
-                  Number(shares[s.key]) < 0 ||
-                  Number(shares[s.key]) > s.total,
-              )
-            }
-            onClick={() => void save()}
-          >
-            {t("Save allocation", "Сохранить распределение", "Bölgünü saxla")}
-          </button>
+          <div className="fw-foot">
+            <button
+              className="ow-primary fw-save"
+              disabled={busy || !finance || !dirty || left !== 0 || !allValid}
+              onClick={() => void save()}
+            >
+              <Check size={18} aria-hidden="true" />
+              {t("Save the split", "Сохранить распределение", "Bölgünü saxla")}
+            </button>
+            <span className="fw-hint" role="status">
+              {saveHint}
+            </span>
+          </div>
           {c.cancellationCount > 0 && (
-            <div className="om-plan">
+            <div className="fw-plan">
               <h3>
                 {t(
                   "Revised payment plan",
@@ -252,45 +409,40 @@ export function FinanceWorkspace({
                   "Ləğvdən sonra qalan xidmətləri yoxlayın. Plan göndəriləndə köhnə açıq ödəniş tələbləri bağlanır. Yeni tələbdən əvvəl müştəri planı təsdiqləməlidir.",
                 )}
               </p>
-              <p>
-                {t("Revised total", "Обновлённая сумма", "Yeni cəm")}:{" "}
-                {fmt(c.services.reduce((s, x) => s + x.total * 100, 0))}
-                <br />
-                {t(
-                  "Received for remaining services",
-                  "Получено за оставшиеся услуги",
-                  "Qalan xidmətlər üzrə alınıb",
-                )}
-                : {fmt(c.allocatableMinor)}
-                <br />
-                {t("Remaining", "Осталось", "Qalıq")}:{" "}
-                {fmt(
-                  Math.max(
-                    0,
-                    c.services.reduce((s, x) => s + x.total * 100, 0) -
-                      c.allocatableMinor,
-                  ),
-                )}
-              </p>
+              <dl className="fw-stats">
+                <div>
+                  <small>{t("Revised total", "Обновлённая сумма", "Yeni cəm")}</small>
+                  <strong>{fmt(c.services.reduce((s, x) => s + x.total * 100, 0))}</strong>
+                </div>
+                <div>
+                  <small>{t("Received for remaining services", "Получено за оставшиеся услуги", "Qalan xidmətlər üzrə alınıb")}</small>
+                  <strong>{fmt(c.allocatableMinor)}</strong>
+                </div>
+                <div>
+                  <small>{t("Remaining", "Осталось", "Qalıq")}</small>
+                  <strong>
+                    {fmt(
+                      Math.max(
+                        0,
+                        c.services.reduce((s, x) => s + x.total * 100, 0) -
+                          c.allocatableMinor,
+                      ),
+                    )}
+                  </strong>
+                </div>
+              </dl>
               {c.plan && (
-                <p>
-                  {t("Plan", "План", "Plan")} v{c.plan.version} ·{" "}
+                <p className="fw-plan-state">
+                  {t("Plan", "План", "Plan")} v{c.plan.version},{" "}
                   {c.plan.state === "ACCEPTED"
-                    ? t(
-                        "Accepted by customer",
-                        "Принят клиентом",
-                        "Müştəri təsdiqləyib",
-                      )
+                    ? t("Accepted by customer", "Принят клиентом", "Müştəri təsdiqləyib")
                     : c.plan.state === "SENT"
-                      ? t(
-                          "Awaiting customer acceptance",
-                          "Ожидает принятия клиентом",
-                          "Müştəri təsdiqi gözlənilir",
-                        )
+                      ? t("Awaiting customer acceptance", "Ожидает принятия клиентом", "Müştəri təsdiqi gözlənilir")
                       : t("Superseded", "Заменён", "Köhnəlib")}
                 </p>
               )}
               <button
+                className="ow-outline fw-send"
                 disabled={
                   busy ||
                   !finance ||
@@ -327,24 +479,25 @@ export function FinanceWorkspace({
                   }
                 }}
               >
-                {t(
-                  "Send reviewed plan",
-                  "Отправить проверенный план",
-                  "Yoxlanmış planı göndər",
-                )}
+                <Send size={16} aria-hidden="true" />
+                {t("Send reviewed plan", "Отправить проверенный план", "Yoxlanmış planı göndər")}
               </button>
             </div>
           )}
         </>
       )}
       {c && !c.contractId && (
-        <p>
-          {t(
-            "Accept the contract before allocating funds.",
-            "Сначала примите договор.",
-            "Bölgüdən əvvəl müqavilə təsdiqlənməlidir.",
-          )}
-        </p>
+        <div className="fw-empty">
+          <Lock size={34} aria-hidden="true" />
+          <strong>{t("The contract is not accepted yet", "Договор ещё не принят", "Müqavilə hələ təsdiqlənməyib")}</strong>
+          <span>
+            {t(
+              "Funds can be allocated after the customer accepts the contract.",
+              "Распределять средства можно после принятия договора клиентом.",
+              "Müştəri müqaviləni təsdiqlədikdən sonra məbləği bölmək olar.",
+            )}
+          </span>
+        </div>
       )}
     </section>
   );

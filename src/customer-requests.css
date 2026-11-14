@@ -1,0 +1,124 @@
+.cq-intro {
+  max-width: 720px;
+  color: #5d675f;
+  line-height: 1.5;
+}
+.cq-tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid #d8dfd1;
+  margin: 8px 0 4px;
+}
+.cq-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: -1px;
+  padding: 10px 16px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: #5d675f;
+  font-weight: 700;
+  cursor: pointer;
+}
+.cq-tabs button.on {
+  border-bottom-color: #e8662f;
+  color: #1c261f;
+}
+.cq-tabs em {
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: #e6ede6;
+  font-style: normal;
+  font-size: 12px;
+}
+.reservation.cq-card {
+  display: grid;
+  gap: 14px;
+  padding: 22px 24px;
+  margin: 16px 0;
+  border-radius: 14px;
+}
+.reservation.cq-card.pending {
+  border-color: #e8a13a;
+  box-shadow: inset 4px 0 0 #e8a13a;
+}
+.cq-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.cq-head small {
+  margin-left: auto;
+  color: #5d675f;
+  font-size: 12.5px;
+}
+.cq-kind,
+.cq-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.cq-kind.CANCEL { background: #f8dcd8; color: #8b2b20; }
+.cq-kind.CHANGE { background: #dfeaf8; color: #1f4a7a; }
+.cq-status.PENDING { background: #fdeccb; color: #7a4f06; }
+.cq-status.ACCEPTED { background: #dff1e3; color: #1f5a31; }
+.cq-status.DECLINED,
+.cq-status.REJECTED { background: #e9ece8; color: #55605a; }
+.reservation .cq-trip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid #d8dfd1;
+  border-radius: 10px;
+  background: #f7f9f5;
+  color: #1c261f;
+  text-align: left;
+  cursor: pointer;
+}
+.cq-trip span {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.cq-trip em {
+  font-style: normal;
+  color: #5d675f;
+}
+.cq-said {
+  display: grid;
+  gap: 6px;
+}
+.reservation .cq-said small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #5d675f;
+}
+.cq-said .customer-note {
+  margin: 0;
+  border-radius: 10px;
+}
+.cq-said.reply .customer-note {
+  background: #eaf3ea;
+  border-left-color: #2f7a49;
+}
+.reservation .cq-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 10px;
+}

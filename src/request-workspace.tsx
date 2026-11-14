@@ -23,6 +23,7 @@ type Row = {
   id: string;
   name: string;
   email: string;
+  phone: string | null;
   title: string;
   departure: string;
   created_at: string;
@@ -101,7 +102,7 @@ export default function RequestWorkspace({
   const serviceLabels: Record<string, string> = {
     transport: t("Driver", "Водитель", "Sürücü"),
     hotel: t("Hotel", "Отель", "Otel"),
-    guide: t("Guide", "Гид", "Gid"),
+    guide: t("Guide", "Гид", "Bələdçi"),
     transfer: t("Transfer", "Трансфер", "Transfer"),
     activity: t("Experience", "Впечатление", "Fəaliyyət"),
   };
@@ -212,6 +213,8 @@ export default function RequestWorkspace({
             " " +
             r.email +
             " " +
+            (r.phone || "") +
+            " " +
             r.title +
             " " +
             (r.route || []).join(" ") +
@@ -293,8 +296,9 @@ export default function RequestWorkspace({
           className="rq-customer"
           title={
             c.row.original.email +
+            (c.row.original.phone ? ", " + c.row.original.phone : "") +
             (c.row.original.assigned_to
-              ? " · " + c.row.original.assigned_to
+              ? ", " + c.row.original.assigned_to
               : "")
           }
         >
@@ -321,7 +325,7 @@ export default function RequestWorkspace({
             className="rq-route"
             title={
               route +
-              " · " +
+              ", " +
               r.services
                 .map((s) => serviceLabels[s.label] || s.label)
                 .join(", ")
@@ -398,9 +402,9 @@ export default function RequestWorkspace({
           <p>
             {data
               ? t(
-                  `${rows.length} requests · ${departing} departing in 7 days`,
-                  `${rows.length} заявок · выезд в ближайшие 7 дней: ${departing}`,
-                  `${rows.length} sorğu · növbəti 7 gündə ${departing} səfər`,
+                  `${rows.length} requests, ${departing} departing in 7 days`,
+                  `${rows.length} заявок, выезд в ближайшие 7 дней: ${departing}`,
+                  `${rows.length} sorğu, növbəti 7 gündə ${departing} səfər`,
                 )
               : t("Loading…", "Загрузка…", "Yüklənir…")}
           </p>
@@ -641,7 +645,7 @@ export default function RequestWorkspace({
                       "sorğunu yeniləyib",
                     )}
                   <small>
-                    #{a.booking_id.slice(0, 8)} · {formatDateTime(a.created_at)}
+                    #{a.booking_id.slice(0, 8)}, {formatDateTime(a.created_at)}
                   </small>
                 </span>
               </button>

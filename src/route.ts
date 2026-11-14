@@ -30,7 +30,7 @@ export const OPEN_VIEWS = Object.keys(SLUGS);
 
 const UUID = /^[0-9a-f-]{8,40}$/i;
 const SUBS: Record<string, string[]> = {
-  Bookings: ["info", "offer", "preview", "status"],
+  Bookings: ["info", "offer", "preview", "status", "manage", "pay", "finance", "docs"],
   Requests: ["amendment", "cancellation"],
 };
 

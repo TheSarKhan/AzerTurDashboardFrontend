@@ -87,8 +87,8 @@ export function MessagesWorkspace({
       {rows.map((m) => (
         <article key={m.id} className="reservation">
           <small>
-            {formatDateTime(m.created_at)} ·{" "}
-            {topics[m.topic] || m.topic} · {m.state}
+            {formatDateTime(m.created_at)},{" "}
+            {topics[m.topic] || m.topic}, {m.state}
           </small>
           <h2>{m.name}</h2>
           <p>

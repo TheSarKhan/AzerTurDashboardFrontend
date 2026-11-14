@@ -54,7 +54,7 @@ export default function PartnerPicker({
         </option>
         {candidates.map((x) => (
           <option value={x.id} key={x.id}>
-            {x.partner_name} · {x.name} · {(x.price_minor / 100).toFixed(2)}{" "}
+            {x.partner_name}, {x.name}, {(x.price_minor / 100).toFixed(2)}{" "}
             {x.currency}
           </option>
         ))}
