@@ -548,6 +548,23 @@ function App() {
   const pending = reservations.filter(
     (b) => b.status === "PENDING_REVIEW",
   ).length;
+  function navigateOffice(next: string) {
+    if (next === view) return;
+    if (
+      offerDirty &&
+      !window.confirm(
+        t(
+          "Discard unsaved changes?",
+          "Отменить несохранённые изменения?",
+          "Saxlanmamış təklif düzəlişləri silinsin?",
+        ),
+      )
+    )
+      return;
+    setOfferDirty(false);
+    setView(next);
+  }
+
   return (
     <div className="shell">
       <aside>
@@ -589,23 +606,7 @@ function App() {
               <button
                 key={title as string}
                 className={view === title ? "active" : ""}
-                onClick={() => {
-                  if (title === view) return;
-                  if (
-                    offerDirty &&
-                    title !== view &&
-                    !window.confirm(
-                      t(
-                        "Discard unsaved changes?",
-                        "Отменить несохранённые изменения?",
-                        "Saxlanmamış təklif düzəlişləri silinsin?",
-                      ),
-                    )
-                  )
-                    return;
-                  setOfferDirty(false);
-                  setView(title as string);
-                }}
+                onClick={() => navigateOffice(title as string)}
               >
                 <I size={18} />
                 {names[title as string]}
@@ -687,6 +688,7 @@ function App() {
             bookings={reservations}
             requests={inbox}
             catalog={catalog}
+            onOpenRequests={() => navigateOffice("Requests")}
             onDirtyChange={setOfferDirty}
           />
         )}

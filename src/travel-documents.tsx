@@ -23,10 +23,12 @@ export default function TravelDocuments({
   bookingId,
   auth,
   locale,
+  hideHeading = false,
 }: {
   bookingId: string;
   auth: string;
   locale: Locale;
+  hideHeading?: boolean;
 }) {
   const t = (en: string, ru: string, az: string) =>
     locale === "az" ? az : locale === "ru" ? ru : en;
@@ -205,13 +207,15 @@ export default function TravelDocuments({
   }
   return (
     <section className="ow-contract">
-      <h2>
-        {t(
-          "Tickets & original documents",
-          "Билеты и оригиналы документов",
-          "Biletlər və orijinal sənədlər",
-        )}
-      </h2>
+      {!hideHeading && (
+        <h2>
+          {t(
+            "Tickets & original documents",
+            "Билеты и оригиналы документов",
+            "Biletlər və orijinal sənədlər",
+          )}
+        </h2>
+      )}
       <p>
         {t(
           "Upload only genuine supplier PDF/JPG/PNG files. No airline QR or barcode is generated here.",

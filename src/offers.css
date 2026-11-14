@@ -591,3 +591,44 @@ body {
 .ow-contract input[type=file] { max-width: 230px; }
 .ow-contract iframe { display: block; margin: 16px 0; }
 @media (max-width: 700px) { .ow-contract { padding: 16px; } .ow-contract label.ow-outline { flex-wrap: wrap; } }
+
+.ow .ow-review section {
+  margin: 0 0 20px;
+}
+
+.ow .ow-review h2 {
+  margin-bottom: 10px;
+}
+
+.ow-route-days {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 8px;
+}
+
+.ow-route-days .ow-day {
+  margin: 0;
+  padding: 8px 10px;
+  gap: 8px;
+  align-items: baseline;
+  overflow-wrap: anywhere;
+}
+
+.ow-secondary {
+  padding: 12px 14px;
+  border: 1px solid #d8dfd1;
+  background: white;
+}
+
+.ow-secondary > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.ow-secondary[open] > summary {
+  margin-bottom: 12px;
+}
+
+.ow-documents {
+  margin-top: 16px;
+}

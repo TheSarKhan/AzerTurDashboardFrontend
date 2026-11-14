@@ -112,6 +112,7 @@ export default function OfferWorkspace({
   requests,
   catalog,
   onDirtyChange,
+  onOpenRequests,
 }: {
   auth: string;
   locale: Locale;
@@ -119,6 +120,7 @@ export default function OfferWorkspace({
   requests: BookingRequest[];
   catalog: Tour[];
   onDirtyChange: (value: boolean) => void;
+  onOpenRequests: () => void;
 }) {
   const t = (en: string, ru: string, az: string) =>
     l === "az" ? az : l === "ru" ? ru : en;
@@ -529,49 +531,6 @@ export default function OfferWorkspace({
                   {t("Reject request", "Отклонить заявку", "Sorğunu rədd et")}
                 </button>
               )}
-              {mode === "review" ? (
-                <button
-                  className="ow-primary"
-                  disabled={!canEdit || busy}
-                  onClick={() => setMode("compose")}
-                >
-                  {t(
-                    "Prepare offer",
-                    "Подготовить предложение",
-                    "Təklif hazırla",
-                  )}
-                  <ArrowRight size={16} />
-                </button>
-              ) : (
-                <>
-                  <button
-                    className="ow-outline"
-                    disabled={busy || !canEdit}
-                    onClick={() => void save()}
-                  >
-                    {t("Save draft", "Сохранить", "Qaralamanı saxla")}
-                  </button>
-                  <button
-                    className="ow-outline"
-                    disabled={busy || !canEdit}
-                    onClick={() => void showPreview()}
-                  >
-                    <Eye size={15} />
-                    {t(
-                      "Preview as customer",
-                      "Просмотр клиента",
-                      "Müştəri kimi bax",
-                    )}
-                  </button>
-                  <button
-                    className="ow-primary"
-                    disabled={!ready || busy || !canEdit}
-                    onClick={() => void send()}
-                  >
-                    {t("Send offer", "Отправить", "Təklifi göndər")}
-                  </button>
-                </>
-              )}
             </div>
           </div>
           {!canEdit && (
@@ -580,7 +539,10 @@ export default function OfferWorkspace({
                 "This booking is read-only in the offer workspace. Existing customer requests remain in Customer requests.",
                 "Эта бронь доступна только для чтения. Изменения — в запросах клиентов.",
                 "Bu rezervasiya təklif bölməsində yalnız baxış üçündür. Dəyişikliklər Müştəri sorğuları bölməsindədir.",
-              )}
+              )}{" "}
+              <button className="ow-link" onClick={onOpenRequests}>
+                {t("Open Customer requests", "Открыть запросы клиентов", "Müştəri sorğularını aç")}
+              </button>
             </p>
           )}
           {pending && (
@@ -641,32 +603,6 @@ export default function OfferWorkspace({
               {t("Activity", "История", "Tarixçə")}
             </button>
           </div>
-          <TravelDocuments key={"documents-"+b.id} bookingId={b.id} auth={auth} locale={l}/>
-          {sentVersion > 0 && (
-            <ContractWorkspace
-              key={b.id}
-              bookingId={b.id}
-              auth={auth}
-              locale={l}
-            />
-          )}
-          {sentVersion > 0 && (
-            <>
-              <FinanceWorkspace
-                bookingId={b.id}
-                auth={auth}
-                locale={l}
-                onDirtyChange={setFinanceDirty}
-              />
-              <PaymentWorkspace
-                key={b.id}
-                bookingId={b.id}
-                auth={auth}
-                locale={l}
-                onDirtyChange={setPaymentDirty}
-              />
-            </>
-          )}
           {audit.length > 0 && (
             <details open className="ow-audit">
               <summary>
@@ -679,12 +615,11 @@ export default function OfferWorkspace({
               ))}
             </details>
           )}
-          <div className="ow-grid">
+          <div className={mode === "review" ? "ow-grid ow-review" : "ow-grid"}>
             <div>
               {mode === "compose" && (
                 <section>
                   <h2>
-                    <span>01</span>
                     {t(
                       "Offer details",
                       "Детали предложения",
@@ -712,7 +647,6 @@ export default function OfferWorkspace({
               )}
               <section>
                 <h2>
-                  <span>{mode === "review" ? "01" : "02"}</span>
                   {mode === "review"
                     ? t(
                         "Requested itinerary",
@@ -721,76 +655,78 @@ export default function OfferWorkspace({
                       )
                     : t("Final itinerary", "Итоговый маршрут", "Yekun marşrut")}
                 </h2>
-                {(mode === "review"
-                  ? initial(b).itinerary
-                  : draft.itinerary
-                ).map((day, i) => (
-                  <div className="ow-day" key={i}>
-                    <strong>
-                      {t("Day", "День", "Gün")} {i + 1}
-                    </strong>
-                    {mode === "compose" ? (
-                      <>
-                        <select
-                          aria-label={
-                            t(
-                              "Destination day ",
-                              "Направление дня ",
-                              "Günün istiqaməti ",
-                            ) +
-                            (i + 1)
-                          }
-                          disabled={!canEdit || busy}
-                          value={day.city}
-                          onChange={(e) =>
-                            edit({
-                              ...draft,
-                              itinerary: draft.itinerary.map((d, n) =>
-                                n === i ? { ...d, city: e.target.value } : d,
+                <div className={mode === "review" ? "ow-route-days" : undefined}>
+                  {(mode === "review"
+                    ? initial(b).itinerary
+                    : draft.itinerary
+                  ).map((day, i) => (
+                    <div className="ow-day" key={i}>
+                      <strong>
+                        {t("Day", "День", "Gün")} {i + 1}
+                      </strong>
+                      {mode === "compose" ? (
+                        <>
+                          <select
+                            aria-label={
+                              t(
+                                "Destination day ",
+                                "Направление дня ",
+                                "Günün istiqaməti ",
+                              ) +
+                              (i + 1)
+                            }
+                            disabled={!canEdit || busy}
+                            value={day.city}
+                            onChange={(e) =>
+                              edit({
+                                ...draft,
+                                itinerary: draft.itinerary.map((d, n) =>
+                                  n === i ? { ...d, city: e.target.value } : d,
+                                ),
+                              })
+                            }
+                          >
+                            {["Baku", "Quba", "Khinalug", "Gabala", "Sheki"].map(
+                              (c) => (
+                                <option key={c}>{c}</option>
                               ),
-                            })
-                          }
-                        >
-                          {["Baku", "Quba", "Khinalug", "Gabala", "Sheki"].map(
-                            (c) => (
-                              <option key={c}>{c}</option>
-                            ),
-                          )}
-                        </select>
-                        <textarea
-                          aria-label={
-                            t(
-                              "Day description ",
-                              "Описание дня ",
-                              "Günün təsviri ",
-                            ) +
-                            (i + 1)
-                          }
-                          maxLength={1500}
-                          disabled={!canEdit || busy}
-                          value={day.description}
-                          onChange={(e) =>
-                            edit({
-                              ...draft,
-                              itinerary: draft.itinerary.map((d, n) =>
-                                n === i
-                                  ? { ...d, description: e.target.value }
-                                  : d,
-                              ),
-                            })
-                          }
-                        />
-                      </>
-                    ) : (
-                      <span>
-                        {day.city}
-                        {day.description !== day.city
-                          ? " · " + day.description
-                          : ""}
-                      </span>
-                    )}
-                  </div>
-                ))}
+                            )}
+                          </select>
+                          <textarea
+                            aria-label={
+                              t(
+                                "Day description ",
+                                "Описание дня ",
+                                "Günün təsviri ",
+                              ) +
+                              (i + 1)
+                            }
+                            maxLength={1500}
+                            disabled={!canEdit || busy}
+                            value={day.description}
+                            onChange={(e) =>
+                              edit({
+                                ...draft,
+                                itinerary: draft.itinerary.map((d, n) =>
+                                  n === i
+                                    ? { ...d, description: e.target.value }
+                                    : d,
+                                ),
+                              })
+                            }
+                          />
+                        </>
+                      ) : (
+                        <span>
+                          {day.city}
+                          {day.description !== day.city
+                            ? " · " + day.description
+                            : ""}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
                 {mode === "compose" ? (
                   <label>
                     {t(
@@ -820,7 +756,6 @@ export default function OfferWorkspace({
               {mode === "review" && (
                 <section>
                   <h2>
-                    <span>02</span>
                     {t(
                       "Customer notes",
                       "Пожелания клиента",
@@ -832,7 +767,6 @@ export default function OfferWorkspace({
               )}
               <section>
                 <h2>
-                  <span>03</span>
                   {mode === "review"
                     ? t(
                         "Service checks",
@@ -949,86 +883,42 @@ export default function OfferWorkspace({
                   </table>
                 </div>
               </section>
-              <section>
-                <h2>
-                  <span>04</span>
-                  {mode === "review"
-                    ? t(
-                        "Internal office note",
-                        "Внутренняя заметка",
-                        "Daxili ofis qeydi",
-                      )
-                    : t(
-                        "Message to customer",
-                        "Сообщение клиенту",
-                        "Müştəriyə mesaj",
-                      )}
-                </h2>
+              {mode === "compose" && (
+                <section>
+                  <h2>{t("Message to customer", "Сообщение клиенту", "Müştəriyə mesaj")}</h2>
+                  <textarea
+                    aria-label={t("Message to customer", "Сообщение клиенту", "Müştəriyə mesaj")}
+                    maxLength={2000}
+                    disabled={!canEdit || busy}
+                    rows={3}
+                    value={draft.message}
+                    onChange={(e) => edit({ ...draft, message: e.target.value })}
+                  />
+                </section>
+              )}
+              <details className="ow-secondary">
+                <summary>
+                  {t(
+                    "Internal office note",
+                    "Внутренняя заметка",
+                    "Daxili ofis qeydi",
+                  )}
+                </summary>
                 <textarea
-                  aria-label={
-                    mode === "review"
-                      ? t(
-                          "Internal office note",
-                          "Внутренняя заметка",
-                          "Daxili ofis qeydi",
-                        )
-                      : t(
-                          "Message to customer",
-                          "Сообщение клиенту",
-                          "Müştəriyə mesaj",
-                        )
-                  }
-                  maxLength={mode === "review" ? 4000 : 2000}
+                  aria-label={t(
+                    "Internal office note",
+                    "Внутренняя заметка",
+                    "Daxili ofis qeydi",
+                  )}
+                  rows={3}
+                  maxLength={4000}
                   disabled={!canEdit || busy}
-                  rows={4}
-                  value={mode === "review" ? draft.internalNote : draft.message}
+                  value={draft.internalNote}
                   onChange={(e) =>
-                    edit({
-                      ...draft,
-                      [mode === "review" ? "internalNote" : "message"]:
-                        e.target.value,
-                    })
+                    edit({ ...draft, internalNote: e.target.value })
                   }
                 />
-                <small>
-                  {mode === "review"
-                    ? t(
-                        "Visible to office staff only.",
-                        "Видно только сотрудникам.",
-                        "Yalnız ofis əməkdaşlarına görünür.",
-                      )
-                    : t(
-                        "Included in the customer offer.",
-                        "Будет в предложении клиенту.",
-                        "Müştəri təklifində görünəcək.",
-                      )}
-                </small>
-              </section>
-              {mode === "compose" && (
-                <details>
-                  <summary>
-                    {t(
-                      "Internal notes — not shared",
-                      "Внутренние заметки — не видны клиенту",
-                      "Daxili qeydlər — paylaşılmır",
-                    )}
-                  </summary>
-                  <textarea
-                    aria-label={t(
-                      "Internal office note",
-                      "Внутренняя заметка",
-                      "Daxili ofis qeydi",
-                    )}
-                    rows={3}
-                    maxLength={4000}
-                    disabled={!canEdit || busy}
-                    value={draft.internalNote}
-                    onChange={(e) =>
-                      edit({ ...draft, internalNote: e.target.value })
-                    }
-                  />
-                </details>
-              )}
+              </details>
             </div>
             <aside className="ow-summary">
               <div>
@@ -1125,6 +1015,10 @@ export default function OfferWorkspace({
                     )}
                   </p>
                 )}
+                <p>
+                  {draft.returnRoute.trim() ? <Check size={15} /> : <Clock size={15} />}{" "}
+                  {t("Return route specified", "Обратный маршрут указан", "Geri dönüş marşrutu qeyd olunub")}
+                </p>
                 <div className="ow-sage">
                   {t(
                     "Offer only. No payment is requested or charged. Contract approval and later service payments are separate planned steps.",
@@ -1200,6 +1094,37 @@ export default function OfferWorkspace({
               )}
             </div>
           </footer>
+          <details key={b.id} className="ow-secondary ow-documents">
+            <summary>
+              {t("Tickets & original documents", "Билеты и оригиналы документов", "Biletlər və orijinal sənədlər")}
+            </summary>
+            <TravelDocuments bookingId={b.id} auth={auth} locale={l} hideHeading />
+          </details>
+          {sentVersion > 0 && (
+            <ContractWorkspace
+              key={b.id}
+              bookingId={b.id}
+              auth={auth}
+              locale={l}
+            />
+          )}
+          {sentVersion > 0 && (
+            <>
+              <FinanceWorkspace
+                bookingId={b.id}
+                auth={auth}
+                locale={l}
+                onDirtyChange={setFinanceDirty}
+              />
+              <PaymentWorkspace
+                key={b.id}
+                bookingId={b.id}
+                auth={auth}
+                locale={l}
+                onDirtyChange={setPaymentDirty}
+              />
+            </>
+          )}
         </>
       )}
       {(editor || preview || reject) && (
