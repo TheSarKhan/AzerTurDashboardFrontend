@@ -214,32 +214,10 @@
 .rq .rq-next:hover {
   border-color: #17212c;
 }
-.rq .rq-owner {
-  display: inline-flex;
-  align-items: center;
-  max-width: 150px;
-  gap: 6px;
-  color: #245644;
-  font-size: 13px;
-}
-.rq .rq-owner.free {
-  color: #8c929a;
-}
 .rq .rq-owner span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.rq-assignee {
-  width: 122px;
-  max-width: 100%;
-  padding: 5px 6px;
-  background: #fff;
-  color: #245644;
-  border: 1px solid #d6ded6;
-  border-radius: 3px;
-  font: inherit;
-  font-size: 12px;
 }
 .rq-state {
   display: inline-flex;

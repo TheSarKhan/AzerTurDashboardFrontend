@@ -10,7 +10,6 @@ import {
 } from "@tanstack/react-table";
 import {
   Search,
-  UserRound,
   ArrowRight,
   ArrowDown,
   ArrowUp,
@@ -157,28 +156,6 @@ export default function RequestWorkspace({
     observer.observe(box);
     return () => observer.disconnect();
   }, []);
-  async function assign(r: Row, assignee?: string) {
-    setBusy(true);
-    setError("");
-    try {
-      await api("/api/v1/operations/bookings/" + r.id + "/assignment", auth, {
-        assign: assignee !== undefined ? !!assignee : !r.assigned_to,
-        assignee: assignee || null,
-        expectedOwner: r.assigned_to,
-      });
-      await load();
-    } catch {
-      setError(
-        t(
-          "Assignment changed or could not be saved. Refresh and retry.",
-          "Назначение изменилось или не сохранено. Обновите список.",
-          "Təyinat dəyişib və ya saxlanmadı. Yeniləyib yoxlayın.",
-        ),
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
   const rows = useMemo(() => data?.rows ?? [], [data]);
   // Status chips group the ten stages into the handful an operator actually works with.
   const groups: { key: string; label: string; stages: string[] }[] = [
@@ -312,7 +289,15 @@ export default function RequestWorkspace({
       id: "customer",
       header: t("Customer", "Клиент", "Müştəri"),
       cell: (c) => (
-        <span className="rq-customer" title={c.row.original.email}>
+        <span
+          className="rq-customer"
+          title={
+            c.row.original.email +
+            (c.row.original.assigned_to
+              ? " · " + c.row.original.assigned_to
+              : "")
+          }
+        >
           {c.getValue()}
         </span>
       ),
@@ -359,59 +344,6 @@ export default function RequestWorkspace({
           {labels[c.getValue()] || c.getValue()}
         </span>
       ),
-    }),
-    column.accessor("assigned_to", {
-      id: "owner",
-      header: t("Assigned to", "Исполнитель", "Məsul"),
-      cell: (c) => {
-        const r = c.row.original;
-        return data?.admin ? (
-          <select
-            className="rq-assignee"
-            aria-label={
-              t("Assigned to", "Исполнитель", "Məsul") + " " + r.id.slice(0, 8)
-            }
-            value={r.assigned_to || ""}
-            disabled={busy}
-            onChange={(e) => void assign(r, e.target.value)}
-          >
-            <option value="">
-              {t("Unassigned", "Не назначено", "Təyin edilməyib")}
-            </option>
-            {r.assigned_to &&
-              !data.staff.some((x) => x.username === r.assigned_to) && (
-                <option value={r.assigned_to}>{r.assigned_to}</option>
-              )}
-            {data.staff.map((x) => (
-              <option key={x.username} value={x.username}>
-                {x.name}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span
-            className={"rq-owner" + (r.assigned_to ? "" : " free")}
-            title={
-              r.assigned_to
-                ? r.assigned_to
-                : t(
-                    "Becomes yours when you open it",
-                    "Станет вашей, когда вы её откроете",
-                    "Açanda sizin üzərinizə düşəcək",
-                  )
-            }
-          >
-            {r.assigned_to ? (
-              <>
-                <UserRound size={14} />
-                <span>{r.assigned_to}</span>
-              </>
-            ) : (
-              <span>{t("Not started", "Не начата", "Başlanmayıb")}</span>
-            )}
-          </span>
-        );
-      },
     }),
     column.display({
       id: "open",
