@@ -1,6 +1,24 @@
 import { OverviewDashboard } from "./overview-dashboard";
 
 const SESSION_KEY = "aztrip.staff.session";
+const VIEWS = [
+  "Overview",
+  "Bookings",
+  "Requests",
+  "Quotes",
+  "Tours",
+  "Notifications",
+  "Events",
+  "Messages",
+  "Partners",
+  "Finance",
+  "Staff",
+];
+/** The module is kept in the address (#Bookings) so a refresh stays where the staff member was. */
+function viewFromAddress() {
+  const name = decodeURIComponent(window.location.hash.slice(1));
+  return VIEWS.includes(name) ? name : "Overview";
+}
 import OfficeManagement from "./office-management";
 import { RefundWorkspace } from "./finance-workspace";
 import { Handshake, Wallet } from "lucide-react";
@@ -155,7 +173,7 @@ function App() {
     [auth, setAuth] = useState(""),
     [staff, setStaff] = useState<Staff | null>(null),
     [accounts, setAccounts] = useState<StaffAccount[]>([]),
-    [view, setView] = useState("Overview"),
+    [view, setView] = useState(viewFromAddress),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [locale, setLocale] = useState<Locale>("az"),
@@ -178,6 +196,10 @@ function App() {
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
+  useEffect(() => {
+    // Only while signed in: the login screen should not carry a module name.
+    if (auth) window.history.replaceState(null, "", "#" + view);
+  }, [view, auth]);
   // A refresh keeps the signed-in staff member: the token lives in this tab's sessionStorage
   // (gone when the tab closes) and is checked with the server before anything is shown.
   useEffect(() => {
