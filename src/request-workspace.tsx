@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createColumnHelper,
   flexRender,
@@ -68,14 +68,13 @@ export default function RequestWorkspace({
     [owner, setOwner] = useState(""),
     [date, setDate] = useState(""),
     [sorting, setSorting] = useState<SortingState>([]),
-    [pagination, setPagination] = useState({
-      pageIndex: 0,
-      // As many 44px rows as fit under the heading, chips and filters, so the page needs no scrolling.
-      pageSize: Math.max(
-        6,
-        Math.min(50, Math.floor((window.innerHeight - 310) / 44)),
-      ),
-    });
+    [pageIndex, setPageIndex] = useState(0),
+    // null = as many rows as fit the screen; a number = the size the staff member picked
+    [manualSize, setManualSize] = useState<number | null>(null),
+    [fit, setFit] = useState({ rows: 10, rowHeight: 44 });
+  const tableBox = useRef<HTMLDivElement>(null);
+  const pageSize = manualSize ?? fit.rows;
+  const pagination = { pageIndex, pageSize };
   const labels: Record<string, string> = {
     NEEDS_REVIEW: t("Needs review", "На проверке", "Yoxlama gözləyir"),
     IN_PREPARATION: t("In preparation", "В подготовке", "Hazırlanır"),
@@ -141,10 +140,23 @@ export default function RequestWorkspace({
   useEffect(() => {
     void load();
   }, [auth, refreshKey]);
-  useEffect(
-    () => setPagination((p) => ({ ...p, pageIndex: 0 })),
-    [search, status, owner, date],
-  );
+  useEffect(() => setPageIndex(0), [search, status, owner, date]);
+  // The table card fills the space under the filters; rows are sized so the last one ends at its bottom edge.
+  useEffect(() => {
+    const box = tableBox.current;
+    if (!box) return;
+    const measure = () => {
+      const head =
+        box.querySelector("thead")?.getBoundingClientRect().height ?? 36;
+      const room = box.clientHeight - head;
+      const rows = Math.max(5, Math.min(50, Math.floor(room / 44)));
+      setFit({ rows, rowHeight: Math.max(44, room / rows) });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, []);
   async function assign(r: Row, assignee?: string) {
     setBusy(true);
     setError("");
@@ -404,7 +416,10 @@ export default function RequestWorkspace({
     columns,
     state: { sorting, pagination },
     onSortingChange: setSorting,
-    onPaginationChange: setPagination,
+    onPaginationChange: (update) => {
+      const next = typeof update === "function" ? update(pagination) : update;
+      setPageIndex(next.pageIndex);
+    },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -514,7 +529,12 @@ export default function RequestWorkspace({
               ))}
             </select>
           </div>
-          <div className="rq-table" aria-busy={busy}>
+          <div
+            className="rq-table"
+            aria-busy={busy}
+            ref={tableBox}
+            style={{ ["--rq-row" as string]: fit.rowHeight + "px" }}
+          >
             <table>
               <thead>
                 {table.getHeaderGroups().map((hg) => (
@@ -569,6 +589,21 @@ export default function RequestWorkspace({
                     ))}
                   </tr>
                 ))}
+                {manualSize === null &&
+                  Array.from({
+                    length: Math.max(
+                      0,
+                      pageSize - table.getRowModel().rows.length,
+                    ),
+                  }).map((_, n) => (
+                    <tr
+                      key={"ghost" + n}
+                      className="rq-ghost"
+                      aria-hidden="true"
+                    >
+                      <td colSpan={columns.length} />
+                    </tr>
+                  ))}
               </tbody>
             </table>
             {!filtered.length && (
@@ -590,21 +625,20 @@ export default function RequestWorkspace({
             <label>
               {t("Rows", "Строк", "Sətir")}
               <select
-                value={pagination.pageSize}
-                onChange={(e) =>
-                  setPagination({
-                    pageIndex: 0,
-                    pageSize: Number(e.target.value),
-                  })
-                }
+                value={manualSize ?? "auto"}
+                onChange={(e) => {
+                  setManualSize(
+                    e.target.value === "auto" ? null : Number(e.target.value),
+                  );
+                  setPageIndex(0);
+                }}
               >
-                {[...new Set([10, 20, 50, pagination.pageSize])]
-                  .sort((x, y) => x - y)
-                  .map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
+                <option value="auto">{t("Auto", "Авто", "Avto")}</option>
+                {[10, 20, 50].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
               </select>
             </label>
             <div>
