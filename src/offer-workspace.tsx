@@ -178,7 +178,6 @@ export default function OfferWorkspace({
       draft?.services.filter(
         (x) => x.availability === "CONFIRMED" && x.supplier.trim(),
       ).length || 0,
-    terms = draft?.services.filter((x) => x.policy.trim()).length || 0,
     pending = requests.some(
       (x) => x.bookingId === selected && x.status === "PENDING",
     );
@@ -222,9 +221,9 @@ export default function OfferWorkspace({
           "Göndərməzdən əvvəl saxlanmış versiyaya baxın.",
         ),
         SERVICE_CHECKS_REQUIRED: t(
-          "Complete supplier, availability and cancellation terms for every service.",
-          "Заполните поставщика, доступность и условия каждой услуги.",
-          "Hər xidmətin təchizatçısını, mövcudluğunu və ləğv şərtlərini tamamlayın.",
+          "Complete the supplier and availability for every service.",
+          "Заполните поставщика и доступность каждой услуги.",
+          "Hər xidmətin təchizatçısını və mövcudluğunu tamamlayın.",
         ),
       }[code] ||
       t(
@@ -364,7 +363,6 @@ export default function OfferWorkspace({
     !!draft &&
     count > 0 &&
     checked === count &&
-    terms === count &&
     !!draft.message.trim() &&
     !!draft.returnRoute.trim() &&
     !pending &&
@@ -788,7 +786,6 @@ export default function OfferWorkspace({
                           t("Quantity", "Количество", "Say"),
                           t("Total", "Сумма", "Cəm"),
                           t("Availability", "Наличие", "Mövcudluq"),
-                          t("Terms", "Условия", "Şərtlər"),
                           t("Action", "Действие", "Əməliyyat"),
                         ].map((s) => (
                           <th key={s}>{s}</th>
@@ -841,19 +838,6 @@ export default function OfferWorkspace({
                               </span>
                             </td>
                             <td>
-                              {line.policy.trim() ? (
-                                <span className="ow-good">
-                                  <Check size={14} />
-                                  {t("Reviewed", "Проверено", "Yoxlanılıb")}
-                                </span>
-                              ) : (
-                                <span className="ow-missing">
-                                  <AlertTriangle size={14} />
-                                  {t("Missing", "Нет", "Çatışmır")}
-                                </span>
-                              )}
-                            </td>
-                            <td>
                               <button
                                 className="ow-link"
                                 disabled={!canEdit || busy}
@@ -868,7 +852,7 @@ export default function OfferWorkspace({
                     </tbody>
                     <tfoot>
                       <tr>
-                        <th colSpan={4}>
+                        <th colSpan={3}>
                           {t(
                             "Group total",
                             "Итого для группы",
@@ -970,14 +954,6 @@ export default function OfferWorkspace({
                     "services available",
                     "услуг доступны",
                     "xidmət mövcuddur",
-                  )}
-                </p>
-                <p className={terms === count ? "ow-good" : "ow-missing"}>
-                  {terms}/{count}{" "}
-                  {t(
-                    "service terms reviewed",
-                    "условий проверено",
-                    "xidmət şərti yoxlanılıb",
                   )}
                 </p>
                 <p>
@@ -1405,28 +1381,6 @@ export default function OfferWorkspace({
                     </strong>
                   </div>
                 </div>
-                <label>
-                  {t(
-                    "Customer-facing cancellation terms",
-                    "Условия отмены для клиента",
-                    "Müştəriyə görünən ləğv şərtləri",
-                  )}
-                  <textarea
-                    rows={4}
-                    maxLength={4000}
-                    value={editor.policy}
-                    onChange={(e) =>
-                      setEditor({ ...editor, policy: e.target.value })
-                    }
-                  />
-                  <small>
-                    {t(
-                      "Required before sending; depends on this service, supplier and timing.",
-                      "Нужно перед отправкой; зависит от услуги, поставщика и времени.",
-                      "Göndərməzdən əvvəl tələb olunur; xidmət, təchizatçı və vaxtdan asılıdır.",
-                    )}
-                  </small>
-                </label>
                 <label>
                   {t(
                     "Internal supplier note",
