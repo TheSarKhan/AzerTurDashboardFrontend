@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type Locale } from "./api/client";
 import "./payments.css";
+import { formatDay, formatDateTime } from "./dates";
 type Request = {
   id: string;
   contract_id: string;
@@ -294,7 +295,7 @@ export default function PaymentWorkspace({
             <div className="payment-grid">
               <div>
                 <p>
-                  {context.offer.title} · {context.offer.date} ·{" "}
+                  {context.offer.title} · {formatDay(context.offer.date)} ·{" "}
                   {context.offer.travelers} {t("travelers", "чел.", "nəfər")}
                 </p>
                 <p>
@@ -512,7 +513,7 @@ export default function PaymentWorkspace({
                     {r.status === "PAID" && r.paid_at && (
                       <small>
                         {" "}
-                        · {new Date(r.paid_at).toLocaleDateString(l)} ·{" "}
+                        · {formatDay(r.paid_at)} ·{" "}
                         {r.payment_method}
                         {r.payment_reference ? " · " + r.payment_reference : ""}
                       </small>

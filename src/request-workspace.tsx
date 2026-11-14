@@ -1,14 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type SortingState,
+} from "@tanstack/react-table";
 import {
   Search,
-  FileText,
-  RefreshCw,
   UserRound,
-  CalendarDays,
   ArrowRight,
+  ArrowDown,
+  ArrowUp,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { formatDateTime, formatDay } from "./dates";
 import { api, type Locale } from "./api/client";
 import "./request-workspace.css";
 type Row = {
@@ -58,8 +67,15 @@ export default function RequestWorkspace({
     [status, setStatus] = useState(""),
     [owner, setOwner] = useState(""),
     [date, setDate] = useState(""),
-    [page, setPage] = useState(1),
-    [selected, setSelected] = useState<string | null>(null);
+    [sorting, setSorting] = useState<SortingState>([]),
+    [pagination, setPagination] = useState({
+      pageIndex: 0,
+      // As many 44px rows as fit under the heading, chips and filters, so the page needs no scrolling.
+      pageSize: Math.max(
+        6,
+        Math.min(50, Math.floor((window.innerHeight - 310) / 44)),
+      ),
+    });
   const labels: Record<string, string> = {
     NEEDS_REVIEW: t("Needs review", "На проверке", "Yoxlama gözləyir"),
     IN_PREPARATION: t("In preparation", "В подготовке", "Hazırlanır"),
@@ -125,7 +141,10 @@ export default function RequestWorkspace({
   useEffect(() => {
     void load();
   }, [auth, refreshKey]);
-  useEffect(() => setPage(1), [search, status, owner, date]);
+  useEffect(
+    () => setPagination((p) => ({ ...p, pageIndex: 0 })),
+    [search, status, owner, date],
+  );
   async function assign(r: Row, assignee?: string) {
     setBusy(true);
     setError("");
@@ -148,33 +167,80 @@ export default function RequestWorkspace({
       setBusy(false);
     }
   }
-  const rows = data?.rows || [],
-    filtered = rows.filter(
-      (r) =>
-        (
-          r.id +
-          " " +
-          r.name +
-          " " +
-          r.email +
-          " " +
-          r.title +
-          " " +
-          (r.route || []).join(" ") +
-          " " +
-          r.services.map((s) => serviceLabels[s.label] || s.label).join(" ")
-        )
-          .toLowerCase()
-          .includes(search.toLowerCase()) &&
-        (!status || r.stage === status) &&
-        (!date || r.departure === date) &&
-        (!owner ||
-          (owner === "unassigned" ? !r.assigned_to : r.assigned_to === owner)),
-    );
-  const pages = Math.max(1, Math.ceil(filtered.length / 6)),
-    currentPage = Math.min(page, pages),
-    visible = filtered.slice((currentPage - 1) * 6, currentPage * 6),
-    chosen = rows.find((r) => r.id === selected);
+  const rows = useMemo(() => data?.rows ?? [], [data]);
+  // Status chips group the ten stages into the handful an operator actually works with.
+  const groups: { key: string; label: string; stages: string[] }[] = [
+    { key: "", label: t("All", "Все", "Hamısı"), stages: [] },
+    {
+      key: "new",
+      label: t("New", "Новые", "Yeni"),
+      stages: ["NEEDS_REVIEW"],
+    },
+    {
+      key: "prep",
+      label: t("In preparation", "В подготовке", "Hazırlanır"),
+      stages: ["IN_PREPARATION"],
+    },
+    {
+      key: "customer",
+      label: t("Awaiting customer", "Ждут клиента", "Müştəri gözləyir"),
+      stages: ["OFFER_SENT"],
+    },
+    {
+      key: "pay",
+      label: t("Contract & deposit", "Договор и депозит", "Müqavilə və beh"),
+      stages: ["CONTRACT_ACCEPTED", "AWAITING_PAYMENT"],
+    },
+    {
+      key: "confirmed",
+      label: t("Confirmed", "Подтверждено", "Təsdiqlənib"),
+      stages: ["CONFIRMED"],
+    },
+    {
+      key: "review",
+      label: t(
+        "Changes & cancellations",
+        "Изменения и отмены",
+        "Dəyişiklik və ləğv",
+      ),
+      stages: ["CANCELLATION_REVIEW", "CHANGE_REVIEW"],
+    },
+    {
+      key: "closed",
+      label: t("Closed", "Закрытые", "Bağlı"),
+      stages: ["CANCELLED", "REJECTED"],
+    },
+  ];
+  const group = groups.find((g) => g.key === status) ?? groups[0];
+  const filtered = useMemo(
+    () =>
+      rows.filter(
+        (r) =>
+          (
+            r.id +
+            " " +
+            r.name +
+            " " +
+            r.email +
+            " " +
+            r.title +
+            " " +
+            (r.route || []).join(" ") +
+            " " +
+            r.services.map((s) => serviceLabels[s.label] || s.label).join(" ")
+          )
+            .toLowerCase()
+            .includes(search.toLowerCase()) &&
+          (!group.stages.length || group.stages.includes(r.stage)) &&
+          (!date || r.departure === date) &&
+          (!owner ||
+            (owner === "unassigned"
+              ? !r.assigned_to
+              : r.assigned_to === owner)),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, search, status, date, owner, locale],
+  );
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Baku",
     year: "numeric",
@@ -184,62 +250,10 @@ export default function RequestWorkspace({
   const end = new Date(today + "T00:00:00Z");
   end.setUTCDate(end.getUTCDate() + 6);
   const last = end.toISOString().slice(0, 10);
-  const active = rows.filter(
-    (r) => !["CANCELLED", "REJECTED"].includes(r.stage),
-  );
-  const metrics = [
-    [
-      FileText,
-      t("New requests", "Новые заявки", "Yeni sorğular"),
-      rows.filter((r) => r.stage === "NEEDS_REVIEW").length,
-    ],
-    [
-      RefreshCw,
-      t("In progress", "В работе", "Hazırlanır"),
-      rows.filter((r) => r.stage === "IN_PREPARATION").length,
-    ],
-    [
-      UserRound,
-      t("Awaiting customer", "Ожидают клиента", "Müştəri gözlənilir"),
-      rows.filter((r) => r.stage === "OFFER_SENT").length,
-    ],
-    [
-      CalendarDays,
-      t(
-        "Departures · next 7 days",
-        "Выезды · 7 дней",
-        "Səfərlər · növbəti 7 gün",
-      ),
-      active.filter(
-        (r) =>
-          r.departure >= today &&
-          r.departure <= last &&
-          r.stage === "CONFIRMED",
-      ).length,
-    ],
-  ] as const;
-  const priorities = [
-    {
-      stage: "NEEDS_REVIEW",
-      text: t(
-        "Check availability",
-        "Проверить доступность",
-        "Mövcudluğu yoxla",
-      ),
-    },
-    {
-      stage: "OFFER_SENT",
-      text: t(
-        "Follow up on offers",
-        "Проверить ответы",
-        "Təklif cavablarını yoxla",
-      ),
-    },
-    {
-      stage: "CANCELLATION_REVIEW",
-      text: t("Review cancellations", "Проверить отмены", "Ləğvləri yoxla"),
-    },
-  ];
+  const departing = rows.filter(
+    (r) =>
+      r.stage === "CONFIRMED" && r.departure >= today && r.departure <= last,
+  ).length;
   const actionLabels: Record<string, string> = {
     REQUESTED: t("created a request", "создал заявку", "sorğu yaradıb"),
     ASSIGNED: t("assigned the request", "назначил заявку", "sorğunu götürüb"),
@@ -251,29 +265,181 @@ export default function RequestWorkspace({
       "müqaviləni təsdiqləyib",
     ),
   };
+
+  const column = createColumnHelper<Row>();
+  const columns = [
+    column.accessor("created_at", {
+      id: "reference",
+      header: t("Request", "Заявка", "Sorğu"),
+      cell: (c) => (
+        <button
+          className="rq-reference"
+          onClick={() => onOpen(c.row.original.id)}
+          title={t("Open request", "Открыть заявку", "Sorğunu aç")}
+        >
+          #{c.row.original.id.slice(0, 8)}
+        </button>
+      ),
+    }),
+    column.accessor("name", {
+      id: "customer",
+      header: t("Customer", "Клиент", "Müştəri"),
+      cell: (c) => (
+        <span className="rq-customer" title={c.row.original.email}>
+          {c.getValue()}
+        </span>
+      ),
+    }),
+    column.accessor("departure", {
+      id: "departure",
+      header: t("Departure", "Выезд", "Səfər tarixi"),
+      cell: (c) => (
+        <span className="rq-date">{formatDay(c.getValue(), locale)}</span>
+      ),
+    }),
+    column.display({
+      id: "route",
+      header: t("Route", "Маршрут", "Marşrut"),
+      enableSorting: false,
+      cell: (c) => {
+        const r = c.row.original;
+        const route = r.route?.length ? r.route.join(" → ") : r.title;
+        return (
+          <span
+            className="rq-route"
+            title={
+              route +
+              " · " +
+              r.services
+                .map((s) => serviceLabels[s.label] || s.label)
+                .join(", ")
+            }
+          >
+            {route}
+          </span>
+        );
+      },
+    }),
+    column.accessor("stage", {
+      id: "status",
+      header: t("Status", "Статус", "Status"),
+      cell: (c) => (
+        <span
+          className={"rq-state rq-state-" + c.getValue()}
+          title={next(c.row.original)}
+        >
+          <i />
+          {labels[c.getValue()] || c.getValue()}
+        </span>
+      ),
+    }),
+    column.accessor("assigned_to", {
+      id: "owner",
+      header: t("Assigned to", "Исполнитель", "Məsul"),
+      cell: (c) => {
+        const r = c.row.original;
+        return data?.admin ? (
+          <select
+            className="rq-assignee"
+            aria-label={
+              t("Assigned to", "Исполнитель", "Məsul") + " " + r.id.slice(0, 8)
+            }
+            value={r.assigned_to || ""}
+            disabled={busy}
+            onChange={(e) => void assign(r, e.target.value)}
+          >
+            <option value="">
+              {t("Unassigned", "Не назначено", "Təyin edilməyib")}
+            </option>
+            {r.assigned_to &&
+              !data.staff.some((x) => x.username === r.assigned_to) && (
+                <option value={r.assigned_to}>{r.assigned_to}</option>
+              )}
+            {data.staff.map((x) => (
+              <option key={x.username} value={x.username}>
+                {x.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <button
+            className="rq-owner"
+            disabled={
+              busy || (!!r.assigned_to && r.assigned_to !== data?.actor)
+            }
+            onClick={() => void assign(r)}
+            title={
+              r.assigned_to
+                ? t("Release assignment", "Снять назначение", "Təyinatı burax")
+                : t("Assign to me", "Назначить мне", "Özümə təyin et")
+            }
+          >
+            <UserRound size={14} />
+            <span>
+              {r.assigned_to ||
+                t("Assign to me", "Назначить мне", "Özümə götür")}
+            </span>
+          </button>
+        );
+      },
+    }),
+    column.display({
+      id: "open",
+      header: "",
+      enableSorting: false,
+      cell: (c) => (
+        <button
+          className="rq-next"
+          onClick={() => onOpen(c.row.original.id)}
+          aria-label={next(c.row.original)}
+          title={next(c.row.original)}
+        >
+          <ArrowRight size={16} />
+        </button>
+      ),
+    }),
+  ];
+  const table = useReactTable({
+    data: filtered,
+    columns,
+    state: { sorting, pagination },
+    onSortingChange: setSorting,
+    onPaginationChange: setPagination,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
+  const from = filtered.length
+      ? pagination.pageIndex * pagination.pageSize + 1
+      : 0,
+    to = Math.min(
+      (pagination.pageIndex + 1) * pagination.pageSize,
+      filtered.length,
+    );
+  const sortFor = (id: string) => {
+    const state = table.getColumn(id)?.getIsSorted();
+    return state === "asc"
+      ? "ascending"
+      : state === "desc"
+        ? "descending"
+        : "none";
+  };
+
   return (
     <section className="rq">
       <div className="rq-heading">
         <div>
           <h1>{t("Requests", "Заявки", "Sorğular")}</h1>
           <p>
-            {t(
-              "Manage customer journeys from first request to departure",
-              "От первой заявки до отправления",
-              "İlk sorğudan səfərə qədər müştəri işlərini idarə edin",
-            )}
+            {data
+              ? t(
+                  `${rows.length} requests · ${departing} departing in 7 days`,
+                  `${rows.length} заявок · выезд в ближайшие 7 дней: ${departing}`,
+                  `${rows.length} sorğu · növbəti 7 gündə ${departing} səfər`,
+                )
+              : t("Loading…", "Загрузка…", "Yüklənir…")}
           </p>
         </div>
-        <button
-          className="rq-primary"
-          disabled={!chosen || busy}
-          onClick={() => chosen && onOpen(chosen.id)}
-        >
-          {chosen
-            ? next(chosen)
-            : t("Select a request", "Выберите заявку", "Sorğu seçin")}
-          <ArrowRight size={17} />
-        </button>
       </div>
       {error && (
         <p role="alert" className="error">
@@ -282,46 +448,42 @@ export default function RequestWorkspace({
       )}
       <div className="rq-layout">
         <div className="rq-main">
-          <div className="rq-metrics">
-            {metrics.map(([Icon, label, count]) => (
-              <div key={label}>
-                <Icon size={25} />
-                <div>
-                  <span>{label}</span>
-                  <strong>{data ? count : "—"}</strong>
-                </div>
-              </div>
-            ))}
+          <div
+            className="rq-chips"
+            role="group"
+            aria-label={t("Status", "Статус", "Status")}
+          >
+            {groups.map((g) => {
+              const n = g.stages.length
+                ? rows.filter((r) => g.stages.includes(r.stage)).length
+                : rows.length;
+              return (
+                <button
+                  key={g.key}
+                  aria-pressed={status === g.key}
+                  onClick={() => setStatus(g.key)}
+                >
+                  {g.label}
+                  <b>{data ? n : "—"}</b>
+                </button>
+              );
+            })}
           </div>
           <div className="rq-filters">
             <label className="rq-search">
-              <Search size={19} />
+              <Search size={17} />
               <input
                 type="search"
                 aria-label={t("Search requests", "Поиск заявок", "Sorğu axtar")}
                 placeholder={t(
-                  "Search by request, customer, destination, service…",
-                  "Заявка, клиент, направление, услуга…",
-                  "Sorğu, müştəri, istiqamət, xidmət…",
+                  "Search by request, customer, destination…",
+                  "Заявка, клиент, направление…",
+                  "Sorğu, müştəri, istiqamət…",
                 )}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </label>
-            <select
-              aria-label={t("Status", "Статус", "Status")}
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              <option value="">
-                {t("All statuses", "Все статусы", "Bütün statuslar")}
-              </option>
-              {Object.entries(labels).map(([key, value]) => (
-                <option key={key} value={key}>
-                  {value}
-                </option>
-              ))}
-            </select>
             <input
               type="date"
               aria-label={t("Travel date", "Дата поездки", "Səfər tarixi")}
@@ -355,141 +517,61 @@ export default function RequestWorkspace({
           <div className="rq-table" aria-busy={busy}>
             <table>
               <thead>
-                <tr>
-                  {[
-                    t("Request", "Заявка", "Sorğu"),
-                    t("Customer", "Клиент", "Müştəri"),
-                    t("Travel dates", "Даты", "Səfər tarixi"),
-                    t("Services", "Услуги", "Xidmətlər"),
-                    t("Status", "Статус", "Status"),
-                    t("Assigned to", "Исполнитель", "Məsul əməkdaş"),
-                    t("Next step", "Следующий шаг", "Növbəti addım"),
-                  ].map((s) => (
-                    <th key={s}>{s}</th>
-                  ))}
-                </tr>
+                {table.getHeaderGroups().map((hg) => (
+                  <tr key={hg.id}>
+                    {hg.headers.map((h) => (
+                      <th
+                        key={h.id}
+                        className={"rq-col-" + h.column.id}
+                        aria-sort={
+                          h.column.getCanSort()
+                            ? sortFor(h.column.id)
+                            : undefined
+                        }
+                      >
+                        {h.column.getCanSort() ? (
+                          <button
+                            className="rq-sort"
+                            onClick={h.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(
+                              h.column.columnDef.header,
+                              h.getContext(),
+                            )}
+                            {h.column.getIsSorted() === "asc" && (
+                              <ArrowUp size={12} />
+                            )}
+                            {h.column.getIsSorted() === "desc" && (
+                              <ArrowDown size={12} />
+                            )}
+                          </button>
+                        ) : (
+                          flexRender(h.column.columnDef.header, h.getContext())
+                        )}
+                      </th>
+                    ))}
+                  </tr>
+                ))}
               </thead>
               <tbody>
-                {visible.map((r) => (
+                {table.getRowModel().rows.map((row) => (
                   <tr
-                    key={r.id}
-                    className={selected === r.id ? "rq-selected" : ""}
+                    key={row.id}
+                    onDoubleClick={() => onOpen(row.original.id)}
                   >
-                    <td>
-                      <button
-                        className="rq-reference"
-                        aria-pressed={selected === r.id}
-                        onClick={() => setSelected(r.id)}
-                      >
-                        #{r.id.slice(0, 8)}
-                      </button>
-                    </td>
-                    <td>
-                      <strong>{r.name}</strong>
-                      <small>{r.email}</small>
-                    </td>
-                    <td>
-                      <CalendarDays size={15} />{" "}
-                      {new Intl.DateTimeFormat(locale, {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                        timeZone: "UTC",
-                      }).format(new Date(r.departure + "T00:00:00Z"))}
-                    </td>
-                    <td>
-                      <span title={r.title}>
-                        {r.services
-                          .map((s) => serviceLabels[s.label] || s.label)
-                          .join(" · ")}
-                      </span>
-                      <small>
-                        {r.route?.length ? r.route.join(" · ") : r.title}
-                      </small>
-                    </td>
-                    <td>
-                      <span className={"rq-state rq-state-" + r.stage}>
-                        <i />
-                        {labels[r.stage] || r.stage}
-                      </span>
-                    </td>
-                    <td>
-                      {data?.admin ? (
-                        <select
-                          className="rq-assignee"
-                          aria-label={
-                            t(
-                              "Assigned to",
-                              "\u0418\u0441\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u044c",
-                              "Məsul",
-                            ) +
-                            " " +
-                            r.id.slice(0, 8)
-                          }
-                          value={r.assigned_to || ""}
-                          disabled={busy}
-                          onChange={(e) => void assign(r, e.target.value)}
-                        >
-                          <option value="">
-                            {t(
-                              "Unassigned",
-                              "\u041d\u0435 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d\u043e",
-                              "Təyin edilməyib",
-                            )}
-                          </option>
-                          {r.assigned_to &&
-                            !data.staff.some(
-                              (x) => x.username === r.assigned_to,
-                            ) && (
-                              <option value={r.assigned_to}>
-                                {r.assigned_to}
-                              </option>
-                            )}
-                          {data.staff.map((x) => (
-                            <option key={x.username} value={x.username}>
-                              {x.name}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <button
-                          className="rq-owner"
-                          disabled={
-                            busy ||
-                            (!!r.assigned_to && r.assigned_to !== data?.actor)
-                          }
-                          onClick={() => void assign(r)}
-                          title={
-                            r.assigned_to
-                              ? t(
-                                  "Release assignment",
-                                  "Снять назначение",
-                                  "Təyinatı burax",
-                                )
-                              : t(
-                                  "Assign to me",
-                                  "Назначить мне",
-                                  "Özümə təyin et",
-                                )
-                          }
-                        >
-                          <UserRound size={15} />
-                          {r.assigned_to ||
-                            t("Assign to me", "Назначить мне", "Özümə götür")}
-                        </button>
-                      )}
-                    </td>
-                    <td>
-                      <button className="rq-next" onClick={() => onOpen(r.id)}>
-                        {next(r)}
-                        <ArrowRight size={14} />
-                      </button>
-                    </td>
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className={"rq-col-" + cell.column.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
             </table>
-            {!visible.length && (
+            {!filtered.length && (
               <p className="rq-empty">
                 {busy
                   ? t("Loading…", "Загрузка…", "Yüklənir…")
@@ -503,9 +585,28 @@ export default function RequestWorkspace({
           </div>
           <div className="rq-pagination">
             <span>
-              {filtered.length ? (currentPage - 1) * 6 + 1 : 0}–
-              {Math.min(currentPage * 6, filtered.length)} / {filtered.length}
+              {from}–{to} / {filtered.length}
             </span>
+            <label>
+              {t("Rows", "Строк", "Sətir")}
+              <select
+                value={pagination.pageSize}
+                onChange={(e) =>
+                  setPagination({
+                    pageIndex: 0,
+                    pageSize: Number(e.target.value),
+                  })
+                }
+              >
+                {[...new Set([10, 20, 50, pagination.pageSize])]
+                  .sort((x, y) => x - y)
+                  .map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+              </select>
+            </label>
             <div>
               <button
                 aria-label={t(
@@ -513,13 +614,13 @@ export default function RequestWorkspace({
                   "Предыдущая страница",
                   "Əvvəlki səhifə",
                 )}
-                disabled={currentPage === 1}
-                onClick={() => setPage(currentPage - 1)}
+                disabled={!table.getCanPreviousPage()}
+                onClick={() => table.previousPage()}
               >
                 <ChevronLeft size={17} />
               </button>
               <span>
-                {currentPage} / {pages}
+                {pagination.pageIndex + 1} / {Math.max(1, table.getPageCount())}
               </span>
               <button
                 aria-label={t(
@@ -527,8 +628,8 @@ export default function RequestWorkspace({
                   "Следующая страница",
                   "Növbəti səhifə",
                 )}
-                disabled={currentPage === pages}
-                onClick={() => setPage(currentPage + 1)}
+                disabled={!table.getCanNextPage()}
+                onClick={() => table.nextPage()}
               >
                 <ChevronRight size={17} />
               </button>
@@ -538,49 +639,9 @@ export default function RequestWorkspace({
         <div className="rq-side">
           <section>
             <h2>
-              {t(
-                "Today’s priorities",
-                "Приоритеты на сегодня",
-                "Günün prioritetləri",
-              )}
-            </h2>
-            {priorities.map((p) => (
-              <button
-                key={p.stage}
-                onClick={() => {
-                  setStatus(p.stage);
-                  setSearch("");
-                  setDate("");
-                  setOwner("");
-                }}
-              >
-                <FileText size={18} />
-                <span>
-                  {p.text}
-                  <small>
-                    {data
-                      ? rows.filter((r) => r.stage === p.stage).length
-                      : "—"}{" "}
-                    {t("requests", "заявок", "sorğu")}
-                  </small>
-                </span>
-                <ArrowRight size={16} />
-              </button>
-            ))}
-            <button
-              className="rq-refresh"
-              disabled={busy}
-              onClick={() => void load()}
-            >
-              <RefreshCw size={15} />
-              {t("Refresh", "Обновить", "Yenilə")}
-            </button>
-          </section>
-          <section>
-            <h2>
               {t("Recent activity", "Последние действия", "Son fəaliyyət")}
             </h2>
-            {data?.activity.slice(0, 3).map((a) => (
+            {data?.activity.slice(0, 5).map((a) => (
               <button
                 className="rq-activity"
                 key={a.id}
@@ -588,8 +649,7 @@ export default function RequestWorkspace({
               >
                 <i />
                 <span>
-                  <strong>{a.actor}</strong>
-                  <br />
+                  <strong>{a.actor}</strong>{" "}
                   {actionLabels[a.action] ||
                     t(
                       "updated the request",
@@ -597,8 +657,7 @@ export default function RequestWorkspace({
                       "sorğunu yeniləyib",
                     )}
                   <small>
-                    #{a.booking_id.slice(0, 8)} ·{" "}
-                    {new Date(a.created_at).toLocaleString(locale)}
+                    #{a.booking_id.slice(0, 8)} · {formatDateTime(a.created_at)}
                   </small>
                 </span>
               </button>
@@ -615,7 +674,6 @@ export default function RequestWorkspace({
           </section>
         </div>
       </div>
-      <footer>© {new Date().getFullYear()} AzTrip.</footer>
     </section>
   );
 }

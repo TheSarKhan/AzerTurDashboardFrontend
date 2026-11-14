@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Plus, Pencil, Check, X, Trash2, Search } from "lucide-react";
 import { api } from "./api/client";
 import "./events.css";
+import { formatDay, formatDateTime } from "./dates";
 
 type T = (en: string, ru: string, az: string) => string;
 type City = { slug: string; nameEn: string; nameRu: string; nameAz: string };
@@ -190,10 +191,7 @@ export function EventsWorkspace({
   }
   const when = (e: Pick<StaffEvent, "startsAt" | "endsAt" | "timeKnown">) => {
     const fmt = (iso: string, withTime: boolean) =>
-      new Date(iso).toLocaleString(locale === "az" ? "az-AZ" : locale === "ru" ? "ru-RU" : "en-GB", {
-        timeZone: "Asia/Baku", day: "numeric", month: "short", year: "numeric",
-        ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}),
-      });
+      withTime ? formatDateTime(iso) : formatDay(iso);
     const a = fmt(e.startsAt, e.timeKnown), b = fmt(e.endsAt, false);
     return e.timeKnown && bakuParts(e.startsAt).date !== bakuParts(e.endsAt).date ? `${a} – ${b}` : a;
   };
@@ -274,7 +272,7 @@ export function EventsWorkspace({
               <>
                 <h3>{t("History", "История", "Tarixçə")}</h3>
                 <ul className="events-audit">
-                  {edit.audit.map((a, i) => <li key={i}><b>{a.action}</b> · {a.actor}<small>{new Date(a.created_at).toLocaleString()}</small>{a.note && <em>{a.note}</em>}</li>)}
+                  {edit.audit.map((a, i) => <li key={i}><b>{a.action}</b> · {a.actor}<small>{formatDateTime(a.created_at)}</small>{a.note && <em>{a.note}</em>}</li>)}
                 </ul>
               </>
             )}

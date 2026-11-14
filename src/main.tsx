@@ -46,6 +46,7 @@ import { EventsWorkspace } from "./events-workspace";
 import { MessagesWorkspace } from "./messages-workspace";
 import "./styles.css";
 import OfferWorkspace from "./offer-workspace";
+import { formatDay, formatDateTime } from "./dates";
 
 function QuoteDetails({
   booking,
@@ -88,7 +89,7 @@ function QuoteDetails({
       <div className="quote-details">
         <dl>
           <dt>{t("Departure", "Отправление", "Başlama")}</dt>
-          <dd>{q.input.date}</dd>
+          <dd>{formatDay(q.input.date)}</dd>
           <dt>{t("Travellers", "Участники", "Səyahətçilər")}</dt>
           <dd>{q.input.pax}</dd>
           {q.input.stay !== false && (
@@ -1089,7 +1090,7 @@ function App() {
                       </td>
                       <td>
                         {a.lastLoginAt
-                          ? new Date(a.lastLoginAt).toLocaleString()
+                          ? formatDateTime(a.lastLoginAt)
                           : t("Never", "Никогда", "Heç vaxt")}
                       </td>
                       <td>
@@ -1201,10 +1202,10 @@ function App() {
                     <tr key={q.id}>
                       <td>
                         <code>{q.id.slice(0, 8)}</code>
-                        <small>{new Date(q.createdAt).toLocaleString()}</small>
+                        <small>{formatDateTime(q.createdAt)}</small>
                       </td>
                       <td>{q.tourSlug}</td>
-                      <td>{q.departure}</td>
+                      <td>{formatDay(q.departure)}</td>
                       <td>
                         {q.total} {q.currency}
                       </td>

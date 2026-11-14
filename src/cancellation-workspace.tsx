@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Car, BedDouble, Users, Plane, Flower2 } from "lucide-react";
 import { api, type Locale, type BookingRequest } from "./api/client";
 import "./cancellation.css";
+import { formatDay, formatDateTime } from "./dates";
 type Tier = {
   fromInclusive: string;
   retainedPercent: string;
@@ -112,8 +113,7 @@ export default function CancellationWorkspace({
       style: "currency",
       currency: context?.offer.currency || "EUR",
     }).format(n / 100);
-  const date = (s: string) =>
-    new Date(s).toLocaleString(l === "az" ? "az-AZ" : l);
+  const date = (s: string) => formatDateTime(s);
   function problem(e: unknown) {
     const code = e instanceof Error ? e.message : "";
     return (
@@ -492,7 +492,7 @@ export default function CancellationWorkspace({
               {context.customer?.name} · {context.offer.title}
             </strong>
             <span>
-              {context.offer.date} · {context.offer.travelers}{" "}
+              {formatDay(context.offer.date)} · {context.offer.travelers}{" "}
               {t("travelers", "чел.", "nəfər")}
             </span>
             <p>

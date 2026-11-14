@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type Locale } from "./api/client";
+import { formatDay, formatDateTime } from "./dates";
 
 type Message = {
   id: string;
@@ -86,7 +87,7 @@ export function MessagesWorkspace({
       {rows.map((m) => (
         <article key={m.id} className="reservation">
           <small>
-            {new Date(m.created_at).toLocaleString(l)} ·{" "}
+            {formatDateTime(m.created_at)} ·{" "}
             {topics[m.topic] || m.topic} · {m.state}
           </small>
           <h2>{m.name}</h2>

@@ -13,6 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { api, type Locale } from "./api/client";
+import { formatDay } from "./dates";
 import "./overview-dashboard.css";
 
 type Period = 7 | 30 | 90 | 365;
@@ -100,56 +101,7 @@ function full(n: number) {
   return Math.round(n).toLocaleString("en").replace(/,/g, "\u00a0");
 }
 
-const MONTHS: Record<Locale, string[]> = {
-  en: [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ],
-  ru: [
-    "янв",
-    "фев",
-    "мар",
-    "апр",
-    "мая",
-    "июн",
-    "июл",
-    "авг",
-    "сен",
-    "окт",
-    "ноя",
-    "дек",
-  ],
-  az: [
-    "yan",
-    "fev",
-    "mar",
-    "apr",
-    "may",
-    "iyn",
-    "iyl",
-    "avq",
-    "sen",
-    "okt",
-    "noy",
-    "dek",
-  ],
-};
-function shortDate(day: string, locale: Locale) {
-  const [, month, date] = day.split("-").map(Number);
-  return locale === "en"
-    ? `${MONTHS.en[month - 1]} ${date}`
-    : `${date} ${MONTHS[locale][month - 1]}`;
-}
+const shortDate = (day: string, _locale?: Locale) => formatDay(day);
 
 function Delta({
   now,

@@ -6,6 +6,7 @@ import type { OfferLine, PublicOffer } from "./offer-types";
 import { lineAmount } from "./offer-pricing";
 import "./cancellation.css";
 import "./amendment.css";
+import { formatDay, formatDateTime } from "./dates";
 type Tier = {
   fromInclusive: string;
   retainedPercent: string;
@@ -277,7 +278,7 @@ export default function AmendmentWorkspace({
             <div>
               <strong>{c.offer.title}</strong>
               <p>
-                {c.offer.date} · {c.offer.travelers}{" "}
+                {formatDay(c.offer.date)} · {c.offer.travelers}{" "}
                 {t("travelers", "туристов", "nəfər")}
               </p>
               <p>

@@ -30,6 +30,7 @@ import {
 import type { OfferDraft, OfferLine, PublicOffer } from "./offer-types";
 import "./offers.css";
 import { lineAmount } from "./offer-pricing";
+import { formatDay, formatDateTime } from "./dates";
 const names: Record<string, string[]> = {
   transport: [
     "Private car & driver",
@@ -599,7 +600,7 @@ export default function OfferWorkspace({
             </div>
             <div>
               <small>{t("Travel dates", "Даты", "Səfər tarixləri")}</small>
-              <strong>{b.departure}</strong>
+              <strong>{formatDay(b.departure)}</strong>
             </div>
             <div>
               <small>{t("Travelers", "Участники", "Səyahətçilər")}</small>
@@ -673,7 +674,7 @@ export default function OfferWorkspace({
               </summary>
               {audit.map((x, i) => (
                 <p key={i}>
-                  {x.created_at} · {x.action} · {x.actor}
+                  {formatDateTime(x.created_at)} · {x.action} · {x.actor}
                 </p>
               ))}
             </details>
@@ -1307,7 +1308,7 @@ export default function OfferWorkspace({
             >
               <h2>{t("Edit service", "Изменить услугу", "Xidməti dəyiş")}</h2>
               <p>
-                {editor.name} · {b?.departure}
+                {editor.name} · {formatDay(b?.departure)}
               </p>
               <PartnerPicker
                 auth={auth}
@@ -1556,7 +1557,7 @@ export default function OfferWorkspace({
               <>
                 <h2>{preview.title}</h2>
                 <p>
-                  {customer?.name} · {preview.date} · {preview.travelers}{" "}
+                  {customer?.name} · {formatDay(preview.date)} · {preview.travelers}{" "}
                   {t("travelers", "чел.", "nəfər")}
                 </p>
                 {preview.itinerary.map((d, i) => (
