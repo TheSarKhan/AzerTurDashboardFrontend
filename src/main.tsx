@@ -1,3 +1,4 @@
+import { OverviewDashboard } from "./overview-dashboard";
 import OfficeManagement from "./office-management";
 import { RefundWorkspace } from "./finance-workspace";
 import { Handshake, Wallet } from "lucide-react";
@@ -589,57 +590,22 @@ function App() {
             {error}
           </p>
         )}
-        <p className="notice">
-          {t(
-            "Review suppliers and service terms before sending an offer. Sending an offer does not open payment.",
-            "Проверьте поставщиков и условия услуг перед отправкой предложения. Отправка не открывает оплату.",
-            "Təklif göndərməzdən əvvəl təchizatçıları və xidmət şərtlərini yoxlayın. Təklif göndərmək ödəniş açmır.",
-          )}
-        </p>
+        {view !== "Overview" && (
+          <p className="notice">
+            {t(
+              "Review suppliers and service terms before sending an offer. Sending an offer does not open payment.",
+              "Проверьте поставщиков и условия услуг перед отправкой предложения. Отправка не открывает оплату.",
+              "Təklif göndərməzdən əvvəl təchizatçıları və xidmət şərtlərini yoxlayın. Təklif göndərmək ödəniş açmır.",
+            )}
+          </p>
+        )}
         {view === "Overview" && (
-          <>
-            <section className="metrics">
-              <article>
-                <p>
-                  {t("Awaiting review", "Ожидают проверки", "Yoxlama gözləyir")}
-                </p>
-                <strong>{pending}</strong>
-              </article>
-              <article>
-                <p>
-                  {t(
-                    "Reservation requests",
-                    "Запросы на бронирование",
-                    "Rezervasiya sorğuları",
-                  )}
-                </p>
-                <strong>{reservations.length}</strong>
-              </article>
-              <article>
-                <p>
-                  {t(
-                    "Customer requests",
-                    "Запросы клиентов",
-                    "Müştəri sorğuları",
-                  )}
-                </p>
-                <strong>
-                  {inbox.filter((r) => r.status === "PENDING").length}
-                </strong>
-              </article>
-            </section>
-            <button onClick={() => setView("Bookings")}>
-              {t(
-                "Open review queue",
-                "Открыть очередь",
-                "Yoxlama növbəsini aç",
-              )}
-              <ArrowUpRight size={18} />
-            </button>
-            <h2>
-              {t("Recent quotes", "Последние расчёты", "Son qiymət sorğuları")}
-            </h2>
-          </>
+          <OverviewDashboard
+            auth={auth}
+            locale={locale}
+            onNavigate={setView}
+            onError={setError}
+          />
         )}
         {view === "Bookings" && (
           <OfferWorkspace
@@ -1167,7 +1133,7 @@ function App() {
             </table>
           </div>
         )}
-        {["Overview", "Quotes"].includes(view) &&
+        {["Quotes"].includes(view) &&
           (data?.recentQuotes.length ? (
             <div className="table-scroll">
               <table>
