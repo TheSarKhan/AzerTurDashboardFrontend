@@ -2,18 +2,9 @@ import { OverviewDashboard } from "./overview-dashboard";
 import { ToursWorkspace } from "./tours-workspace";
 
 const SESSION_KEY = "aztrip.staff.session";
-const VIEWS = [
-  "Overview",
-  "Bookings",
-  "Requests",
-  "Tours",
-  "Notifications",
-  "Events",
-  "Messages",
-  "Partners",
-  "Finance",
-  "Staff",
-];
+// Only these modules can be entered for now; every other one is shown locked in the menu.
+// "Requests" is not in the menu but is still reached from inside a request.
+const VIEWS = ["Overview", "Bookings", "Requests"];
 /** The module is kept in the address (#Bookings) so a refresh stays where the staff member was. */
 function viewFromAddress() {
   const name = decodeURIComponent(window.location.hash.slice(1));
@@ -21,7 +12,7 @@ function viewFromAddress() {
 }
 import OfficeManagement from "./office-management";
 import { RefundWorkspace } from "./finance-workspace";
-import { Handshake, Wallet } from "lucide-react";
+import { Handshake, Lock } from "lucide-react";
 import AmendmentWorkspace from "./amendment-workspace";
 import CancellationWorkspace from "./cancellation-workspace";
 import React, { useState, useEffect } from "react";
@@ -33,10 +24,8 @@ import {
   ArrowUpRight,
   RefreshCw,
   ClipboardCheck,
-  Bell,
   Users,
   CalendarDays,
-  MessageSquare,
 } from "lucide-react";
 import {
   api,
@@ -540,7 +529,7 @@ function App() {
     (b) => b.status === "PENDING_REVIEW",
   ).length;
   function navigateOffice(next: string) {
-    if (next === view) return;
+    if (next === view || !VIEWS.includes(next)) return;
     if (
       offerDirty &&
       !window.confirm(
@@ -583,22 +572,35 @@ function App() {
             [LayoutDashboard, "Overview"],
             [ClipboardCheck, "Bookings"],
             [Map, "Tours"],
-            [Bell, "Notifications"],
             [CalendarDays, "Events"],
-            [MessageSquare, "Messages"],
             [Handshake, "Partners"],
-            [Wallet, "Finance"],
             ...(staff?.role === "ADMIN" ? [[Users, "Staff"]] : []),
           ].map(([Icon, title]) => {
             const I = Icon as typeof Map;
+            const key = title as string;
+            const locked = !VIEWS.includes(key);
             return (
               <button
-                key={title as string}
-                className={view === title ? "active" : ""}
-                onClick={() => navigateOffice(title as string)}
+                key={key}
+                className={
+                  (view === key ? "active" : "") + (locked ? " locked" : "")
+                }
+                disabled={locked}
+                aria-disabled={locked}
+                title={
+                  locked
+                    ? t(
+                        "This module is locked for now",
+                        "Этот раздел пока закрыт",
+                        "Bu modul hələlik bağlıdır",
+                      )
+                    : undefined
+                }
+                onClick={() => navigateOffice(key)}
               >
                 <I size={18} />
-                {names[title as string]}
+                {names[key]}
+                {locked && <Lock size={14} className="nav-lock" />}
               </button>
             );
           })}

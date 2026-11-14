@@ -479,28 +479,6 @@ export function OverviewDashboard({
         "Dəyişiklik və ləğv sorğuları",
       ),
     },
-    {
-      key: "refunds",
-      icon: Banknote,
-      n: data.attention.refunds,
-      view: "Finance",
-      text: t(
-        "Refunds in progress",
-        "Возвраты в работе",
-        "İcra olunan geri ödənişlər",
-      ),
-    },
-    {
-      key: "messages",
-      icon: MessageSquare,
-      n: data.attention.messages,
-      view: "Messages",
-      text: t(
-        "New messages from the website",
-        "Новые сообщения с сайта",
-        "Saytdan gələn yeni mesajlar",
-      ),
-    },
   ];
   const waiting = attention.filter((a) => a.n > 0);
   const f = data.finance;
