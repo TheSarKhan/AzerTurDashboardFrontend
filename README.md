@@ -30,3 +30,19 @@ The dashboard includes named staff accounts and server-enforced roles, administr
 ## Account security and paid changes
 
 Email verification, password recovery and session revocation now protect customer writes. Paid changes use a separately reviewed proposal and exact PDF acceptance before the effective booking changes. See [setup, workflow and verification](docs/ACCOUNT_SECURITY_AMENDMENTS.md). This work is stacked on `feature/complete-office-workflows`; live delivery still needs the configured server SMTP environment.
+
+## Page addresses
+
+Every page has its own address in the hash, so it can be refreshed, bookmarked, shared and walked back with the browser's back button (see `src/route.ts`):
+
+| Address | Page |
+|---|---|
+| `#/overview` | Overview |
+| `#/requests` | Requests list |
+| `#/requests/<id>` | One request |
+| `#/requests/<id>/offer` | Offer composer for that request |
+| `#/customer-requests` | Customer requests |
+| `#/customer-requests/<id>/amendment` | Change proposal |
+| `#/customer-requests/<id>/cancellation` | Cancellation review |
+
+Only the open modules have addresses; any other address opens the overview.

@@ -1,15 +1,8 @@
 import { OverviewDashboard } from "./overview-dashboard";
 import { ToursWorkspace } from "./tours-workspace";
+import { OPEN_VIEWS, navigate, useRoute } from "./route";
 
 const SESSION_KEY = "aztrip.staff.session";
-// Only these modules can be entered for now; every other one is shown locked in the menu.
-// "Requests" is not in the menu but is still reached from inside a request.
-const VIEWS = ["Overview", "Bookings", "Requests"];
-/** The module is kept in the address (#Bookings) so a refresh stays where the staff member was. */
-function viewFromAddress() {
-  const name = decodeURIComponent(window.location.hash.slice(1));
-  return VIEWS.includes(name) ? name : "Overview";
-}
 import OfficeManagement from "./office-management";
 import { RefundWorkspace } from "./finance-workspace";
 import { Handshake, Lock } from "lucide-react";
@@ -146,10 +139,24 @@ function QuoteDetails({
 function App() {
   const [roles, setRoles] = useState<string[]>([]);
   const [offerDirty, setOfferDirty] = useState(false);
-  const [amendmentRequestId, setAmendmentRequestId] = useState<string | null>(
-    null,
-  );
-  const [cancelRequestId, setCancelRequestId] = useState<string | null>(null);
+  const route = useRoute();
+  const view = route.view;
+  const amendmentRequestId =
+    view === "Requests" && route.sub === "amendment"
+      ? (route.id ?? null)
+      : null;
+  const cancelRequestId =
+    view === "Requests" && route.sub === "cancellation"
+      ? (route.id ?? null)
+      : null;
+  const setAmendmentRequestId = (id: string | null) =>
+    navigate(
+      id ? { view: "Requests", id, sub: "amendment" } : { view: "Requests" },
+    );
+  const setCancelRequestId = (id: string | null) =>
+    navigate(
+      id ? { view: "Requests", id, sub: "cancellation" } : { view: "Requests" },
+    );
   const [catalog, setCatalog] = useState<Tour[]>([]),
     [reservations, setReservations] = useState<Booking[]>([]),
     [inbox, setInbox] = useState<BookingRequest[]>([]),
@@ -157,7 +164,6 @@ function App() {
     [auth, setAuth] = useState(""),
     [staff, setStaff] = useState<Staff | null>(null),
     [accounts, setAccounts] = useState<StaffAccount[]>([]),
-    [view, setView] = useState(viewFromAddress),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [locale, setLocale] = useState<Locale>("az"),
@@ -180,10 +186,10 @@ function App() {
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
+  // Show the canonical address once signed in (also turns an empty or locked one into #/overview).
   useEffect(() => {
-    // Only while signed in: the login screen should not carry a module name.
-    if (auth) window.history.replaceState(null, "", "#" + view);
-  }, [view, auth]);
+    if (auth) navigate(route, { replace: true });
+  }, [auth]); // eslint-disable-line react-hooks/exhaustive-deps
   // A refresh keeps the signed-in staff member: the token lives in this tab's sessionStorage
   // (gone when the tab closes) and is checked with the server before anything is shown.
   useEffect(() => {
@@ -340,7 +346,6 @@ function App() {
     setOutbox([]);
     setAccounts([]);
     setHistory({});
-    setView("Overview");
   }
   async function load(credentials: string) {
     setBusy(true);
@@ -529,7 +534,7 @@ function App() {
     (b) => b.status === "PENDING_REVIEW",
   ).length;
   function navigateOffice(next: string) {
-    if (next === view || !VIEWS.includes(next)) return;
+    if (next === view || !OPEN_VIEWS.includes(next)) return;
     if (
       offerDirty &&
       !window.confirm(
@@ -542,7 +547,7 @@ function App() {
     )
       return;
     setOfferDirty(false);
-    setView(next);
+    navigate({ view: next });
   }
 
   return (
@@ -578,7 +583,7 @@ function App() {
           ].map(([Icon, title]) => {
             const I = Icon as typeof Map;
             const key = title as string;
-            const locked = !VIEWS.includes(key);
+            const locked = !OPEN_VIEWS.includes(key);
             return (
               <button
                 key={key}
@@ -668,7 +673,7 @@ function App() {
           <OverviewDashboard
             auth={auth}
             locale={locale}
-            onNavigate={setView}
+            onNavigate={navigateOffice}
             onError={setError}
           />
         )}

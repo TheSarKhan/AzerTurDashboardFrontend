@@ -5,6 +5,7 @@ import RequestWorkspace from "./request-workspace";
 import PaymentWorkspace from "./payment-workspace";
 import ContractWorkspace from "./contract-workspace";
 import { useEffect, useRef, useState } from "react";
+import { navigate, useRoute } from "./route";
 import {
   ArrowLeft,
   ArrowRight,
@@ -146,9 +147,20 @@ export default function OfferWorkspace({
   const [paymentDirty, setPaymentDirty] = useState(false);
   const [reject, setReject] = useState(false);
   const [freshBooking, setFreshBooking] = useState<Booking | null>(null);
-  const [selected, setSelected] = useState<string | null>(null),
-    [mode, setMode] = useState<"review" | "compose">("review"),
-    [draft, setDraft] = useState<OfferDraft | null>(null),
+  // Which request is open, and whether its offer composer is showing, lives in the address.
+  const route = useRoute();
+  const selected = route.view === "Bookings" ? (route.id ?? null) : null;
+  const mode: "review" | "compose" =
+    route.view === "Bookings" && route.sub === "offer" ? "compose" : "review";
+  const setSelected = (id: string | null) =>
+    navigate({ view: "Bookings", id: id ?? undefined });
+  const setMode = (next: "review" | "compose") =>
+    navigate({
+      view: "Bookings",
+      id: selected ?? undefined,
+      sub: next === "compose" ? "offer" : undefined,
+    });
+  const [draft, setDraft] = useState<OfferDraft | null>(null),
     [customer, setCustomer] = useState<{
       name: string;
       email: string;
@@ -169,7 +181,10 @@ export default function OfferWorkspace({
     [search, setSearch] = useState("");
   const modalRef = useRef<HTMLDialogElement>(null),
     focusRef = useRef<HTMLElement | null>(null);
-  const b = freshBooking || bookings.find((x) => x.id === selected);
+  const b =
+    freshBooking?.id === selected
+      ? freshBooking
+      : bookings.find((x) => x.id === selected);
   const canEdit =
     b?.status === "PENDING_REVIEW" && b.paid === 0 && receivedMinor === 0;
   const count = draft?.services.length || 0,
@@ -280,6 +295,13 @@ export default function OfferWorkspace({
   );
   useEffect(() => {
     if (selected) void load(selected);
+    else {
+      // Back to the list (also through the browser's back button): drop what belonged to the request.
+      setDirty(false);
+      setDraft(null);
+      setError("");
+      setNotice("");
+    }
   }, [selected]);
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -424,11 +446,24 @@ export default function OfferWorkspace({
         auth={auth}
         refreshKey={bookings}
         locale={l}
-        onOpen={(id) => {
-          setMode("review");
-          setSelected(id);
-        }}
+        onOpen={(id) => setSelected(id)}
       />
+    );
+  if (!b)
+    return (
+      <div className="ow">
+        <p role="alert" className="ow-error">
+          {t(
+            "This request was not found.",
+            "Заявка не найдена.",
+            "Bu sorğu tapılmadı.",
+          )}
+        </p>
+        <button className="ow-link" onClick={() => setSelected(null)}>
+          <ArrowLeft size={15} />
+          {t("Back to requests", "К заявкам", "Sorğulara qayıt")}
+        </button>
+      </div>
     );
   return (
     <div className="ow">
