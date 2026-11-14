@@ -5,11 +5,12 @@ import { useSyncExternalStore } from "react";
  *   #/overview                           İcmal
  *   #/requests                           Sorğular (list)
  *   #/requests/<id>                      one request, review
- *   #/requests/<id>/offer                one request, offer composer
+ *   #/requests/<id>/info|offer|preview|status   the steps of one request
  *   #/customer-requests                  Müştəri sorğuları
  *   #/customer-requests/<id>/amendment   change proposal
  *   #/customer-requests/<id>/cancellation cancellation review
- * Only the modules below can be entered for now; anything else opens the overview.
+ * Modules hidden from the menu (Notifications, Messages, Refunds) have no address and open the overview.
+ * Top-level pages of the other modules: #/tours  #/events  #/partners  #/staff
  */
 export type Route = { view: string; id?: string; sub?: string };
 
@@ -17,6 +18,10 @@ const SLUGS: Record<string, string> = {
   Overview: "overview",
   Bookings: "requests",
   Requests: "customer-requests",
+  Tours: "tours",
+  Events: "events",
+  Partners: "partners",
+  Staff: "staff",
 };
 const BY_SLUG = Object.fromEntries(
   Object.entries(SLUGS).map(([view, slug]) => [slug, view]),
@@ -25,7 +30,7 @@ export const OPEN_VIEWS = Object.keys(SLUGS);
 
 const UUID = /^[0-9a-f-]{8,40}$/i;
 const SUBS: Record<string, string[]> = {
-  Bookings: ["offer"],
+  Bookings: ["info", "offer", "preview", "status"],
   Requests: ["amendment", "cancellation"],
 };
 

@@ -660,13 +660,6 @@ function App() {
             {error}
           </p>
         )}
-        {(view === "Bookings" || view === "Requests") && (
-          <p className="notice">
-            {t(
-              "Review suppliers and service terms before sending an offer. Sending an offer does not open payment.",
-              "Проверьте поставщиков и условия услуг перед отправкой предложения. Отправка не открывает оплату.",
-              "Təklif göndərməzdən əvvəl təchizatçıları və xidmət şərtlərini yoxlayın. Təklif göndərmək ödəniş açmır.",
-            )}
           </p>
         )}
         {view === "Overview" && (

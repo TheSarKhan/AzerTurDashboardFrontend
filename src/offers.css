@@ -632,3 +632,175 @@ body {
 .ow-documents {
   margin-top: 16px;
 }
+
+/* ---- Request wizard: Request → Offer → Preview & send → Status ---- */
+.ow-wizard {
+  position: relative;
+}
+.ow-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.ow-steps {
+  display: flex;
+  gap: 8px;
+  list-style: none;
+  margin: 6px 0 22px;
+  padding: 0;
+  border-bottom: 1px solid #d8dfd1;
+}
+.ow-steps li {
+  flex: 1;
+  min-width: 0;
+}
+.ow-steps button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 8px;
+  background: none;
+  color: #4a5666;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  font-size: 14px;
+  text-align: left;
+}
+.ow-steps b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  background: #e9eddf;
+  color: #2b4230;
+  border-radius: 50%;
+  font-size: 13px;
+}
+.ow-steps li.current button {
+  color: #1d211e;
+  font-weight: 700;
+  border-bottom-color: #ed7b47;
+}
+.ow-steps li.current b {
+  background: #ed7b47;
+  color: #fff;
+}
+.ow-steps li.done b {
+  background: #405b46;
+  color: #fff;
+}
+.ow-steps li.off button {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ow-step-body {
+  display: grid;
+  gap: 20px;
+}
+.ow-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.ow-info-grid > section {
+  padding: 18px 20px;
+  background: #fff;
+  border: 1px solid #d8dfd1;
+  border-radius: 6px;
+}
+.ow-info-grid .ow-wide {
+  grid-column: 1/-1;
+}
+.ow-info-grid h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+.ow-choices {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.ow-choices li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eef1ea;
+}
+.ow-choices small,
+.ow-sub {
+  color: #626a63;
+  font-size: 13px;
+}
+.ow-issues {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 12px 16px;
+  list-style: none;
+  background: #fdf0dc;
+  border: 1px solid #f1d6a8;
+  border-radius: 4px;
+  color: #8a4f06;
+  font-size: 13px;
+}
+.ow-issues li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ow-status {
+  padding: 18px 20px;
+  background: #fff;
+  border: 1px solid #d8dfd1;
+  border-radius: 6px;
+}
+.ow-status h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+.ow-history {
+  position: absolute;
+  top: 36px;
+  right: 0;
+  z-index: 20;
+  width: 320px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #d8dfd1;
+  border-radius: 6px;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 14%);
+  font-size: 13px;
+}
+.ow-history p {
+  margin: 0 0 10px;
+}
+.ow-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+@media (max-width: 800px) {
+  .ow-steps button {
+    font-size: 12px;
+    padding: 10px 4px;
+  }
+  .ow-steps b {
+    display: none;
+  }
+  .ow-info-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

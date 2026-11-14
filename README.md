@@ -40,9 +40,10 @@ Every page has its own address in the hash, so it can be refreshed, bookmarked, 
 | `#/overview` | Overview |
 | `#/requests` | Requests list |
 | `#/requests/<id>` | One request |
-| `#/requests/<id>/offer` | Offer composer for that request |
+| `#/requests/<id>/info`, `/offer`, `/preview`, `/status` | The four wizard steps of one request |
+| `#/tours`, `#/events`, `#/partners`, `#/staff` | Tours, Events, Partners, Staff (admins) |
 | `#/customer-requests` | Customer requests |
 | `#/customer-requests/<id>/amendment` | Change proposal |
 | `#/customer-requests/<id>/cancellation` | Cancellation review |
 
-Only the open modules have addresses; any other address opens the overview.
+Modules hidden from the menu (Notifications, Messages, Refunds) have no address; an unknown address opens the overview.
