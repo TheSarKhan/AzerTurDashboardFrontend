@@ -1,4 +1,6 @@
 import { OverviewDashboard } from "./overview-dashboard";
+
+const SESSION_KEY = "aztrip.staff.session";
 import OfficeManagement from "./office-management";
 import { RefundWorkspace } from "./finance-workspace";
 import { Handshake, Wallet } from "lucide-react";
@@ -161,6 +163,13 @@ function App() {
     [amendments, setAmendments] = useState<
       Record<string, { id: string; total: number; currency: string }>
     >({});
+  const [restoring, setRestoring] = useState(() => {
+    try {
+      return !!sessionStorage.getItem(SESSION_KEY);
+    } catch {
+      return false;
+    }
+  });
   const t = (en: string, ru: string, az: string) =>
     locale === "az" ? az : locale === "ru" ? ru : en;
   // admin.* is for administrators only; the API enforces roles, this keeps the UI honest.
@@ -168,6 +177,30 @@ function App() {
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
+  // A refresh keeps the signed-in staff member: the token lives in this tab's sessionStorage
+  // (gone when the tab closes) and is checked with the server before anything is shown.
+  useEffect(() => {
+    let token: string | null = null;
+    try {
+      token = sessionStorage.getItem(SESSION_KEY);
+    } catch {
+      /* ignore */
+    }
+    if (!token) return;
+    const saved = token;
+    (async () => {
+      try {
+        const me = await api<Staff>("/api/v1/staff/auth/me", saved);
+        if (adminHost && me.role !== "ADMIN") throw new Error("ACCESS_DENIED");
+        setStaff(me);
+        if (!(await load(saved))) reset();
+      } catch {
+        reset();
+      } finally {
+        setRestoring(false);
+      }
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (view !== "Staff" || staff?.role !== "ADMIN" || !auth) return;
     staffAccounts(auth)
@@ -288,6 +321,11 @@ function App() {
         );
   }
   function reset() {
+    try {
+      sessionStorage.removeItem(SESSION_KEY);
+    } catch {
+      /* private mode: the session simply will not survive a refresh */
+    }
     setAuth("");
     setStaff(null);
     setData(null);
@@ -352,6 +390,12 @@ function App() {
       if (!(await load(token))) {
         setStaff(null);
         await staffLogout(token).catch(() => undefined);
+      } else {
+        try {
+          sessionStorage.setItem(SESSION_KEY, token);
+        } catch {
+          /* ignore */
+        }
       }
     } catch (e) {
       setError(problem(e));
@@ -410,6 +454,12 @@ function App() {
       </select>
     </label>
   );
+  if (restoring && !auth)
+    return (
+      <main className="login" aria-busy="true">
+        <p>{t("Loading…", "Загрузка…", "Yüklənir…")}</p>
+      </main>
+    );
   if (!auth)
     return (
       <main className="login">
