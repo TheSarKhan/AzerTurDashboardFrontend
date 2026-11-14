@@ -1,11 +1,11 @@
 import { OverviewDashboard } from "./overview-dashboard";
+import { ToursWorkspace } from "./tours-workspace";
 
 const SESSION_KEY = "aztrip.staff.session";
 const VIEWS = [
   "Overview",
   "Bookings",
   "Requests",
-  "Quotes",
   "Tours",
   "Notifications",
   "Events",
@@ -29,12 +29,10 @@ import { createRoot } from "react-dom/client";
 import {
   LayoutDashboard,
   Map,
-  FileText,
   LogOut,
   ArrowUpRight,
   RefreshCw,
   ClipboardCheck,
-  Inbox,
   Bell,
   Users,
   CalendarDays,
@@ -42,7 +40,6 @@ import {
 } from "lucide-react";
 import {
   api,
-  overview,
   tours,
   bookings,
   requests,
@@ -52,7 +49,6 @@ import {
   staffAccounts,
   type Staff,
   type StaffAccount,
-  type Overview,
   type Tour,
   type Booking,
   type BookingRequest,
@@ -165,8 +161,7 @@ function App() {
     null,
   );
   const [cancelRequestId, setCancelRequestId] = useState<string | null>(null);
-  const [data, setData] = useState<Overview | null>(null),
-    [catalog, setCatalog] = useState<Tour[]>([]),
+  const [catalog, setCatalog] = useState<Tour[]>([]),
     [reservations, setReservations] = useState<Booking[]>([]),
     [inbox, setInbox] = useState<BookingRequest[]>([]),
     [outbox, setOutbox] = useState<Notification[]>([]),
@@ -235,7 +230,6 @@ function App() {
     Finance: t("Refunds", "Возвраты", "Geri ödənişlər"),
     Overview: t("Overview", "Обзор", "İcmal"),
     Tours: t("Tours", "Туры", "Turlar"),
-    Quotes: t("Quotes", "Расчёты", "Qiymət sorğuları"),
     Bookings: t("Requests", "Заявки", "Sorğular"),
     Requests: t("Customer requests", "Запросы клиентов", "Müştəri sorğuları"),
     Notifications: t("Notifications", "Уведомления", "Bildirişlər"),
@@ -351,7 +345,6 @@ function App() {
     }
     setAuth("");
     setStaff(null);
-    setData(null);
     setCatalog([]);
     setReservations([]);
     setInbox([]);
@@ -364,8 +357,7 @@ function App() {
     setBusy(true);
     setError("");
     try {
-      const [summary, list, b, r, n] = await Promise.all([
-        overview(credentials),
+      const [list, b, r, n] = await Promise.all([
         tours(),
         bookings(credentials),
         requests(credentials),
@@ -375,7 +367,6 @@ function App() {
         (await api<{ roles: string[] }>("/api/v1/operations/me", credentials))
           .roles,
       );
-      setData(summary);
       setCatalog(list);
       setReservations(b);
       setInbox(r);
@@ -591,9 +582,7 @@ function App() {
           {[
             [LayoutDashboard, "Overview"],
             [ClipboardCheck, "Bookings"],
-            [Inbox, "Requests"],
             [Map, "Tours"],
-            [FileText, "Quotes"],
             [Bell, "Notifications"],
             [CalendarDays, "Events"],
             [MessageSquare, "Messages"],
@@ -664,7 +653,7 @@ function App() {
             {error}
           </p>
         )}
-        {view !== "Overview" && (
+        {(view === "Bookings" || view === "Requests") && (
           <p className="notice">
             {t(
               "Review suppliers and service terms before sending an offer. Sending an offer does not open payment.",
@@ -1174,85 +1163,13 @@ function App() {
           </>
         )}
         {view === "Tours" && (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>{t("Journey", "Поездка", "Səfər")}</th>
-                  <th>{t("Region", "Регион", "Bölgə")}</th>
-                  <th>{t("Duration", "Длительность", "Müddət")}</th>
-                  <th>
-                    {t("From / person", "От / чел.", "Başlayan qiymət / nəfər")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {catalog.map((tour) => (
-                  <tr key={tour.slug}>
-                    <td>
-                      {locale === "az"
-                        ? tour.titleAz
-                        : locale === "ru"
-                          ? tour.titleRu
-                          : tour.titleEn}
-                      <small>{tour.slug}</small>
-                    </td>
-                    <td>{tour.region}</td>
-                    <td>
-                      {tour.days} {t("days", "дн.", "gün")}
-                    </td>
-                    <td>€{tour.fromPriceEur}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ToursWorkspace
+            auth={auth}
+            locale={locale}
+            tours={catalog}
+            onCreated={(tour) => setCatalog((list) => [...list, tour])}
+          />
         )}
-        {["Quotes"].includes(view) &&
-          (data?.recentQuotes.length ? (
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>{t("Reference", "Номер", "Nömrə")}</th>
-                    <th>{t("Journey", "Поездка", "Səfər")}</th>
-                    <th>{t("Departure", "Отправление", "Başlama")}</th>
-                    <th>{t("Total", "Всего", "Cəmi")}</th>
-                    <th>{t("Deposit", "Депозит", "Depozit")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.recentQuotes.map((q) => (
-                    <tr key={q.id}>
-                      <td>
-                        <code>{q.id.slice(0, 8)}</code>
-                        <small>{formatDateTime(q.createdAt)}</small>
-                      </td>
-                      <td>{q.tourSlug}</td>
-                      <td>{formatDay(q.departure)}</td>
-                      <td>
-                        {q.total} {q.currency}
-                      </td>
-                      <td>
-                        {q.deposit} {q.currency}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <section className="empty">
-              <FileText size={32} />
-              <h2>
-                {t(
-                  "No quotes yet.",
-                  "Нет расчётов.",
-                  "Hələ qiymət sorğusu yoxdur.",
-                )}
-              </h2>
-            </section>
-          ))}
       </main>
     </div>
   );
