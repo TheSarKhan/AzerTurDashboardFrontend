@@ -660,8 +660,6 @@ function App() {
             {error}
           </p>
         )}
-          </p>
-        )}
         {view === "Overview" && (
           <OverviewDashboard
             auth={auth}
