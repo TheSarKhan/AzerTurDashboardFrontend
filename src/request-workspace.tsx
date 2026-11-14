@@ -278,6 +278,21 @@ export default function RequestWorkspace({
     ),
   };
 
+  /** Opening a request is starting work on it: an unowned one becomes the operator's own. */
+  async function openRequest(r: Row) {
+    if (!r.assigned_to && data && !data.admin) {
+      try {
+        await api(
+          "/api/v1/operations/bookings/" + r.id + "/assignment/claim",
+          auth,
+          {},
+        );
+      } catch {
+        /* someone else may have claimed it first; the request still opens */
+      }
+    }
+    onOpen(r.id);
+  }
   const column = createColumnHelper<Row>();
   const columns = [
     column.accessor("created_at", {
@@ -286,7 +301,7 @@ export default function RequestWorkspace({
       cell: (c) => (
         <button
           className="rq-reference"
-          onClick={() => onOpen(c.row.original.id)}
+          onClick={() => void openRequest(c.row.original)}
           title={t("Open request", "Открыть заявку", "Sorğunu aç")}
         >
           #{c.row.original.id.slice(0, 8)}
@@ -374,24 +389,27 @@ export default function RequestWorkspace({
             ))}
           </select>
         ) : (
-          <button
-            className="rq-owner"
-            disabled={
-              busy || (!!r.assigned_to && r.assigned_to !== data?.actor)
-            }
-            onClick={() => void assign(r)}
+          <span
+            className={"rq-owner" + (r.assigned_to ? "" : " free")}
             title={
               r.assigned_to
-                ? t("Release assignment", "Снять назначение", "Təyinatı burax")
-                : t("Assign to me", "Назначить мне", "Özümə təyin et")
+                ? r.assigned_to
+                : t(
+                    "Becomes yours when you open it",
+                    "Станет вашей, когда вы её откроете",
+                    "Açanda sizin üzərinizə düşəcək",
+                  )
             }
           >
-            <UserRound size={14} />
-            <span>
-              {r.assigned_to ||
-                t("Assign to me", "Назначить мне", "Özümə götür")}
-            </span>
-          </button>
+            {r.assigned_to ? (
+              <>
+                <UserRound size={14} />
+                <span>{r.assigned_to}</span>
+              </>
+            ) : (
+              <span>{t("Not started", "Не начата", "Başlanmayıb")}</span>
+            )}
+          </span>
         );
       },
     }),
@@ -402,7 +420,7 @@ export default function RequestWorkspace({
       cell: (c) => (
         <button
           className="rq-next"
-          onClick={() => onOpen(c.row.original.id)}
+          onClick={() => void openRequest(c.row.original)}
           aria-label={next(c.row.original)}
           title={next(c.row.original)}
         >
@@ -577,7 +595,7 @@ export default function RequestWorkspace({
                 {table.getRowModel().rows.map((row) => (
                   <tr
                     key={row.id}
-                    onDoubleClick={() => onOpen(row.original.id)}
+                    onDoubleClick={() => void openRequest(row.original)}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id} className={"rq-col-" + cell.column.id}>

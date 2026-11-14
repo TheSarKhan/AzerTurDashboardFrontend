@@ -216,21 +216,19 @@
 }
 .rq .rq-owner {
   display: inline-flex;
+  align-items: center;
   max-width: 150px;
   gap: 6px;
-  padding: 4px 8px;
-  background: none;
   color: #245644;
-  border: 0;
   font-size: 13px;
+}
+.rq .rq-owner.free {
+  color: #8c929a;
 }
 .rq .rq-owner span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.rq .rq-owner:not(:disabled):hover {
-  background: #f0f5ec;
 }
 .rq-assignee {
   width: 122px;
