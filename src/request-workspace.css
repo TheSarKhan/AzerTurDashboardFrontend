@@ -469,3 +469,9 @@
     grid-column: 1/-1;
   }
 }
+
+.rq-nextstep {
+  color: #3f4a41;
+  font-weight: 600;
+  white-space: nowrap;
+}

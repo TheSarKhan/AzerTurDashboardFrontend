@@ -241,3 +241,61 @@
     padding: 8px;
   }
 }
+
+/* ---------- contrast, steps and action hint ---------- */
+.cancel-ops .cancel-ops-grid > aside {
+  background: #eef1e9;
+  color: #1c261f;
+  border-radius: 14px;
+}
+.cancel-ops .cancel-ops-grid > aside h2,
+.cancel-ops .cancel-ops-grid > aside dt,
+.cancel-ops .cancel-ops-grid > aside dd,
+.cancel-ops .cancel-ops-grid > aside p {
+  color: #1c261f;
+}
+.cancel-ops .cancel-ops-grid > aside dd:first-of-type {
+  color: #235345;
+}
+.cancel-ops .cancel-ops-grid > aside p {
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.cancel-ops .cancel-steps {
+  gap: 12px;
+  padding: 16px 0;
+  list-style: none;
+  counter-reset: cs;
+}
+.cancel-ops .cancel-steps li {
+  counter-increment: cs;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #d8dfd1;
+  font-weight: 700;
+}
+.cancel-ops .cancel-steps li::before {
+  content: counter(cs);
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #1f4d3a;
+  color: #fff;
+  font-size: 12px;
+}
+.cancel-actions {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.cancel-actions .cancel-hint {
+  flex: 1 1 100%;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+}

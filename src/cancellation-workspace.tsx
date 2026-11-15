@@ -82,6 +82,7 @@ export default function CancellationWorkspace({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [preview, setPreview] = useState(false),
+    [hint, setHint] = useState(""),
     [explanation, setExplanation] = useState(""),
     [internal, setInternal] = useState("");
   const serviceNames: Record<string, string> = {
@@ -354,7 +355,7 @@ export default function CancellationWorkspace({
   }
   if (context && !context.contractId)
     return (
-      <section className="cancel-ops">
+      <section className="cancel-ops cq-simple">
         <button className="cancel-link" onClick={onBack}>
           {t(
             "← Customer requests",
@@ -365,71 +366,87 @@ export default function CancellationWorkspace({
         <h1>
           {t("Review cancellation", "Проверить отмену", "Ləğv sorğusunu yoxla")}
         </h1>
-        <p>{request.message}</p>
-        {error && (
-          <p className="cancel-error" role="alert">
-            {error}
+        <div className="cq-simple-card">
+          <div className="cq-said">
+            <small>{t("Customer wrote", "Клиент написал", "Müştəri yazıb")}</small>
+            <p className="customer-note">{request.message}</p>
+          </div>
+          <p className="cq-simple-info">
+            {t(
+              "No accepted contract or received payment. There is no refund to calculate.",
+              "Нет принятого договора или полученной оплаты. Возврат рассчитывать не требуется.",
+              "Təsdiqlənmiş müqavilə və qəbul olunmuş ödəniş yoxdur. Geri ödəniş hesablanmır.",
+            )}
           </p>
-        )}
-        <p>
-          {t(
-            "No accepted contract or received payment. There is no refund to calculate.",
-            "Нет принятого договора или полученной оплаты. Возврат рассчитывать не требуется.",
-            "Təsdiqlənmiş müqavilə və qəbul olunmuş ödəniş yoxdur. Geri ödəniş hesablanmır.",
+          {error && (
+            <p className="cancel-error" role="alert">
+              {error}
+            </p>
           )}
-        </p>
-        {context.request.status === "PENDING" ? (
-          <>
-            <label>
-              {t("Response to customer", "Ответ клиенту", "Müştəriyə cavab")}
-              <textarea
-                minLength={3}
-                maxLength={2000}
-                value={explanation}
-                onChange={(e) => {
-                  setExplanation(e.target.value);
-                  setDirty(true);
-                }}
-              />
-            </label>
-            {[true, false].map((approve) => (
-              <button
-                key={String(approve)}
-                disabled={busy || explanation.trim().length < 3}
-                onClick={async () => {
-                  setBusy(true);
-                  setError("");
-                  try {
-                    await api(
-                      "/api/v1/operations/requests/" + request.id + "/resolve",
-                      auth,
-                      { approve, note: explanation },
-                    );
-                    setDirty(false);
-                    onDone();
-                    await load();
-                  } catch (e) {
-                    setError(problem(e));
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-              >
-                {approve
-                  ? t(
-                      "Approve cancellation",
-                      "Одобрить отмену",
-                      "Ləğvi təsdiqlə",
-                    )
-                  : t("Decline request", "Отклонить", "Sorğunu rədd et")}
-              </button>
-            ))}
-          </>
-        ) : (
-          <p>
-            {t("Decision recorded", "Решение сохранено", "Qərar qeydə alınıb")}
-          </p>
-        )}
+          {context.request.status === "PENDING" ? (
+            <>
+              <label>
+                {t("Response to customer", "Ответ клиенту", "Müştəriyə cavab")}
+                <textarea
+                  minLength={3}
+                  maxLength={2000}
+                  rows={4}
+                  value={explanation}
+                  onChange={(e) => {
+                    setExplanation(e.target.value);
+                    setDirty(true);
+                    setError("");
+                  }}
+                />
+              </label>
+              <div className="cq-simple-actions">
+                {[true, false].map((approve) => (
+                  <button
+                    key={String(approve)}
+                    className={approve ? "cq-primary" : "cq-decline"}
+                    disabled={busy}
+                    onClick={async () => {
+                      if (explanation.trim().length < 3) {
+                        setError(
+                          t(
+                            "Write a short response to the customer first (at least 3 characters).",
+                            "Сначала напишите клиенту короткий ответ (минимум 3 символа).",
+                            "Əvvəl müştəriyə qısa cavab yazın (ən azı 3 simvol).",
+                          ),
+                        );
+                        return;
+                      }
+                      setBusy(true);
+                      setError("");
+                      try {
+                        await api(
+                          "/api/v1/operations/requests/" + request.id + "/resolve",
+                          auth,
+                          { approve, note: explanation },
+                        );
+                        setDirty(false);
+                        onDone();
+                        await load();
+                      } catch (e) {
+                        setError(problem(e));
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    {approve
+                      ? t("Approve cancellation", "Одобрить отмену", "Ləğvi təsdiqlə")
+                      : t("Decline request", "Отклонить", "Sorğunu rədd et")}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="cq-simple-info">
+              {t("Decision recorded", "Решение сохранено", "Qərar qeydə alınıb")}
+            </p>
+          )}
+        </div>
       </section>
     );
   return (
@@ -958,9 +975,25 @@ export default function CancellationWorkspace({
           )}
           {!readonly && (
             <footer className="cancel-actions">
+              {hint && (
+                <p className="cancel-error cancel-hint" role="alert">
+                  {hint}
+                </p>
+              )}
               <button
-                disabled={busy || explanation.trim().length < 3}
+                disabled={busy}
                 onClick={async () => {
+                  if (explanation.trim().length < 3) {
+                    setHint(
+                      t(
+                        "Write a response to the customer before declining (at least 3 characters).",
+                        "Напишите клиенту ответ перед отклонением (минимум 3 символа).",
+                        "Rədd etməzdən əvvəl müştəriyə cavab yazın (ən azı 3 simvol).",
+                      ),
+                    );
+                    return;
+                  }
+                  setHint("");
                   if (
                     !window.confirm(
                       t(
@@ -991,14 +1024,50 @@ export default function CancellationWorkspace({
                 {t("Decline request", "Отклонить запрос", "Sorğunu rədd et")}
               </button>
               <button
-                disabled={busy || !ready || (!dirty && !!saved)}
-                onClick={() => void save()}
+                disabled={busy}
+                onClick={() => {
+                  if (!ready) {
+                    setHint(
+                      t(
+                        "Fill in the rule and the amounts for every cancelled service first.",
+                        "Сначала заполните правило и суммы по каждой отменённой услуге.",
+                        "Əvvəl ləğv olunan hər xidmət üçün qaydanı və məbləğləri doldurun.",
+                      ),
+                    );
+                    return;
+                  }
+                  if (!dirty && saved) {
+                    setHint(
+                      t(
+                        "Nothing has changed since the last save.",
+                        "С последнего сохранения ничего не изменилось.",
+                        "Son saxlamadan bəri dəyişiklik yoxdur.",
+                      ),
+                    );
+                    return;
+                  }
+                  setHint("");
+                  void save();
+                }}
               >
                 {t("Save assessment", "Сохранить расчёт", "Hesablamanı saxla")}
               </button>
               <button
-                disabled={busy || dirty || !saved}
-                onClick={() => setPreview(true)}
+                disabled={busy}
+                onClick={() => {
+                  if (dirty || !saved) {
+                    setHint(
+                      t(
+                        "Save the assessment first, then preview the customer summary.",
+                        "Сначала сохраните расчёт, затем откройте предпросмотр.",
+                        "Əvvəl hesablamanı saxlayın, sonra müştəri xülasəsinə baxın.",
+                      ),
+                    );
+                    return;
+                  }
+                  setHint("");
+                  setPreview(true);
+                }}
               >
                 {t(
                   "Preview customer summary",
@@ -1008,8 +1077,31 @@ export default function CancellationWorkspace({
               </button>
               <button
                 className="cancel-primary"
-                disabled={busy || dirty || !saved || !preview || !ready}
-                onClick={() => void approve()}
+                disabled={busy}
+                onClick={() => {
+                  if (dirty || !saved || !ready) {
+                    setHint(
+                      t(
+                        "Save the assessment first. Approval needs a saved, complete assessment.",
+                        "Сначала сохраните расчёт. Для утверждения нужен сохранённый полный расчёт.",
+                        "Əvvəl hesablamanı saxlayın. Təsdiq üçün saxlanmış, tam hesablama lazımdır.",
+                      ),
+                    );
+                    return;
+                  }
+                  if (!preview) {
+                    setHint(
+                      t(
+                        "Preview the customer summary before approving.",
+                        "Перед утверждением откройте предпросмотр клиента.",
+                        "Təsdiqdən əvvəl müştəri xülasəsinə baxın.",
+                      ),
+                    );
+                    return;
+                  }
+                  setHint("");
+                  void approve();
+                }}
               >
                 {t(
                   "Approve cancellation plan",

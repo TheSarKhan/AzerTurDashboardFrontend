@@ -350,6 +350,12 @@ export default function RequestWorkspace({
       ),
     }),
     column.display({
+      id: "nextStep",
+      header: t("Next step", "Следующий шаг", "Növbəti addım"),
+      enableSorting: false,
+      cell: (c) => <span className="rq-nextstep">{next(c.row.original)}</span>,
+    }),
+    column.display({
       id: "open",
       header: "",
       enableSorting: false,

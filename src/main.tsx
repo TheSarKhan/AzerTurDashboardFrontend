@@ -1064,6 +1064,15 @@ function App() {
             onError={setError}
           />
         )}
+        {view === "Staff" && staff && staff.role !== "ADMIN" && (
+          <div className="empty">
+            {t(
+              "This page is for administrators only.",
+              "Эта страница только для администраторов.",
+              "Bu səhifə yalnız administratorlar üçündür.",
+            )}
+          </div>
+        )}
         {view === "Staff" && staff?.role === "ADMIN" && (
           <>
             <p>

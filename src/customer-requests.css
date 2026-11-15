@@ -122,3 +122,62 @@
   padding: 0 20px;
   border-radius: 10px;
 }
+
+/* simple cancellation (no contract, no payment) */
+.cq-simple {
+  max-width: 820px;
+}
+.cq-simple-card {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid #d8dfd1;
+  border-radius: 14px;
+  background: #fff;
+}
+.cq-simple-card label {
+  display: grid;
+  gap: 8px;
+  font-weight: 600;
+}
+.cq-simple-card textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #cbd5cc;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 400;
+}
+.cq-simple-info {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #eef3ee;
+  color: #3f4a41;
+  line-height: 1.45;
+}
+.cq-simple-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.cq-simple-actions button {
+  min-height: 46px;
+  padding: 0 22px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.cq-simple-actions .cq-primary {
+  border: 0;
+  background: #1f4d3a;
+  color: #fff;
+}
+.cq-simple-actions .cq-decline {
+  border: 1px solid #a3382b;
+  background: #fff;
+  color: #a3382b;
+}
+.cq-simple .cancel-error {
+  margin: 0;
+}

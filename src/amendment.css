@@ -105,3 +105,128 @@
     padding: 18px;
   }
 }
+
+/* ---------- clearer header, summary and option chips ---------- */
+.amendment-workspace > button:first-child {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: #1f4a2c;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.amendment-workspace > header {
+  margin: 8px 0 18px;
+}
+.amendment-workspace > header p {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: #b4502a;
+}
+.amendment-workspace > header h2 {
+  margin: 0;
+  font-size: 30px;
+}
+.amendment-summary {
+  grid-template-columns: 1.4fr 1fr 0.8fr;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #d8dfd1;
+  border-radius: 14px;
+}
+.amendment-summary > div {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 24px 26px;
+  border-left: 1px solid #e6ebe4;
+}
+.amendment-summary > div:first-child {
+  border-left: 0;
+}
+.amendment-summary h3 {
+  margin: 0;
+  font-size: 20px;
+}
+.amendment-summary p {
+  margin: 0;
+  color: #4b554e;
+}
+.amendment-summary > div:first-child p:last-child {
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f3f6f2;
+  color: #1c261f;
+}
+.amendment-summary > div:last-child {
+  background: #eaf3ea;
+}
+.amendment-summary > div:last-child span {
+  font-size: 13px;
+  color: #3f6049;
+}
+.amendment-summary > div:last-child h3 {
+  font-size: 30px;
+}
+.amendment-workspace .notice {
+  margin: 0 0 8px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #eef3ee;
+  color: #3f4a41;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.amendment-grid:has(.amendment-check) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 8px 0 16px;
+}
+.amendment-workspace .amendment-check {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  width: auto;
+  margin: 0;
+  padding: 10px 16px;
+  border: 1px solid #c9d4c9;
+  border-radius: 999px;
+  background: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.amendment-workspace .amendment-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: #2f7a49;
+}
+.amendment-workspace .amendment-check:has(input:checked) {
+  border-color: #2f7a49;
+  background: #eaf3ea;
+}
+@media (max-width: 850px) {
+  .amendment-summary {
+    grid-template-columns: 1fr;
+  }
+  .amendment-summary > div {
+    border-left: 0;
+    border-top: 1px solid #e6ebe4;
+  }
+  .amendment-summary > div:first-child {
+    border-top: 0;
+  }
+}
